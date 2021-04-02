@@ -11,7 +11,7 @@ class FeatureExtractor():
     """
     def __init__(self):
         # Establish feature families
-        self.features = [x for x in dir(self) if x[0:2] != '__']
+        self.features = [x for x in dir(self) if x[0:1] != '_']
         self.families = ['nobs_brighter_than',
                          'slope',
                          'same_nite_color_diff',
@@ -35,8 +35,7 @@ class FeatureExtractor():
 
 
     # Family 1: Nobs bright than
-    @staticmethod
-    def __family1(lc, flt, threshold):
+    def __family1(self, lc, flt, threshold):
         mag_arr = self.__get_mags(lc, flt)
         if len(mag_arr) > 0:
             return sum((mag_arr < threshold))
@@ -71,10 +70,10 @@ class FeatureExtractor():
     def nobs_brighter_than_22(self, lc, flt1, flt2=None):
         return self.__family1(lc, flt1, 22.0)
     
-    def nobs_brighter_than_225(self, lc, md, flt1, flt2=None):
+    def nobs_brighter_than_225(self, lc, flt1, flt2=None):
         return self.__family1(lc, flt1, 22.5)
 
-    def nobs_brighter_than_23(self, lc, md, flt1, flt2=None):
+    def nobs_brighter_than_23(self, lc, flt1, flt2=None):
         return self.__family1(lc, flt1, 23.0)
 
     def nobs_brighter_than_17_any_flt(self, lc, flt1, flt2=None):
@@ -115,8 +114,8 @@ class FeatureExtractor():
             return lc['MJD'].values[lc['FLT'].values == flt].astype(float)
 
     def slope_average(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) > 1:
             if mjds[-1] != mjds[0]:
                 return (mags[-1] - mags[0]) / (mjds[-1] - mjds[0])
@@ -126,32 +125,32 @@ class FeatureExtractor():
             return 'N'
             
     def slope_max(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) > 1:
             return np.max(np.diff(mags) / np.diff(mjds))
         else:
             return 'N'
 
     def slope_min(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) > 1:
             return np.min(np.diff(mags) / np.diff(mjds))
         else:
             return 'N'
 
     def slope_mjd_of_max(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) > 1:
             return mjds[np.argmax(np.diff(mags) / np.diff(mjds))]
         else:
             return 'N'
 
-    def slope_mjd_of_min(self, lc, md, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+    def slope_mjd_of_min(self, lc, flt1, flt2=None):
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) > 1:
             return mjds[np.argmin(np.diff(mags) / np.diff(mjds))]
         else:
@@ -159,8 +158,7 @@ class FeatureExtractor():
 
 
     # Family 3: Same night color difference
-    @staticmethod
-    def __get_nite_color(lc, flt1, flt2):
+    def __get_nite_color(self, lc, flt1, flt2):
         lc['NITE'] = lc['MJD'].values.astype(float).round().astype(int)
         nites = lc.groupby('NITE')
         colors = []
@@ -263,7 +261,7 @@ class FeatureExtractor():
         if len(flux) == 0:
             return 'N'
         else:
-            return lc['MJD'].values[np.argmax(flux / fluxerrs)]
+            return lc['MJD'].values[np.argmax(flux / fluxerr)]
 
 
     # Family 6: Flat line fitting
