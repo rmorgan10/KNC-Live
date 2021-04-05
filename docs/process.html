@@ -36,7 +36,12 @@ import os
 import numpy as np
 import pandas as pd
 
-import feature_extraction
+try:
+    import feature_extraction
+except ModuleNotFoundError:
+    import sys
+    sys.path.append(&#39;knc&#39;)
+    import feature_extraction
 
 class ArgumentError(Exception):
     &#34;&#34;&#34;

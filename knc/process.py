@@ -7,7 +7,12 @@ import os
 import numpy as np
 import pandas as pd
 
-import feature_extraction
+try:
+    import feature_extraction
+except ModuleNotFoundError:
+    import sys
+    sys.path.append('knc')
+    import feature_extraction
 
 class ArgumentError(Exception):
     """
