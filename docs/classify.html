@@ -31,9 +31,17 @@
 Classify datasets
 &#34;&#34;&#34;
 import argparse
+import os
 
 import numpy as np
 import pandas as pd
+
+
+class ArgumentError(Exception):
+    &#34;&#34;&#34;
+    A class to raise errors for invalid arguments
+    &#34;&#34;&#34;
+    pass
 
 def load_classifier(filename : str) -&gt; dict :
     &#34;&#34;&#34;
@@ -235,14 +243,25 @@ def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
 
     return args
 
+def classify_main(args):
+    &#34;&#34;&#34;
+    Run KNC-Live in classification mode
+
+    Args:
+        args (argpars.Namespace): parsed arguments for classify.py
+    &#34;&#34;&#34;
+    # Run classification
+    results = classify.classify_datasets(
+        load_classifier(args.datasets_file),
+        args.id_map_file,
+        args.rfc_dir)
+
+    # Save results
+    results.to_csv(f&#34;{args.results_dir}{args.results_outfile}&#34;, index=False)
+
+
 if __name__ == &#34;__main__&#34;:
     
-    import argparse
-    import os
-
-    from knc.knc import ArgumentError
-    from knc.knc import classify_main
-
     # Get and validate the command line arguments
     args = check_args(parse_args())
 
@@ -410,6 +429,37 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
                                                    res[&#39;PROB_KN&#39;].values)]
 
     return pd.DataFrame(data=classified_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;])</code></pre>
+</details>
+</dd>
+<dt id="knc.classify.classify_main"><code class="name flex">
+<span>def <span class="ident">classify_main</span></span>(<span>args)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Run KNC-Live in classification mode</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>args</code></strong> :&ensp;<code>argpars.Namespace</code></dt>
+<dd>parsed arguments for classify.py</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def classify_main(args):
+    &#34;&#34;&#34;
+    Run KNC-Live in classification mode
+
+    Args:
+        args (argpars.Namespace): parsed arguments for classify.py
+    &#34;&#34;&#34;
+    # Run classification
+    results = classify.classify_datasets(
+        load_classifier(args.datasets_file),
+        args.id_map_file,
+        args.rfc_dir)
+
+    # Save results
+    results.to_csv(f&#34;{args.results_dir}{args.results_outfile}&#34;, index=False)</code></pre>
 </details>
 </dd>
 <dt id="knc.classify.clean_data"><code class="name flex">
@@ -599,6 +649,31 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
 </dl>
 </section>
 <section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="knc.classify.ArgumentError"><code class="flex name class">
+<span>class <span class="ident">ArgumentError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A class to raise errors for invalid arguments</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ArgumentError(Exception):
+    &#34;&#34;&#34;
+    A class to raise errors for invalid arguments
+    &#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -617,11 +692,19 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
 <li><code><a title="knc.classify.calibrate" href="#knc.classify.calibrate">calibrate</a></code></li>
 <li><code><a title="knc.classify.check_args" href="#knc.classify.check_args">check_args</a></code></li>
 <li><code><a title="knc.classify.classify_datasets" href="#knc.classify.classify_datasets">classify_datasets</a></code></li>
+<li><code><a title="knc.classify.classify_main" href="#knc.classify.classify_main">classify_main</a></code></li>
 <li><code><a title="knc.classify.clean_data" href="#knc.classify.clean_data">clean_data</a></code></li>
 <li><code><a title="knc.classify.get_classifier_filename" href="#knc.classify.get_classifier_filename">get_classifier_filename</a></code></li>
 <li><code><a title="knc.classify.load_classifier" href="#knc.classify.load_classifier">load_classifier</a></code></li>
 <li><code><a title="knc.classify.parse_args" href="#knc.classify.parse_args">parse_args</a></code></li>
 <li><code><a title="knc.classify.predict" href="#knc.classify.predict">predict</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="knc.classify.ArgumentError" href="#knc.classify.ArgumentError">ArgumentError</a></code></h4>
+</li>
 </ul>
 </li>
 </ul>

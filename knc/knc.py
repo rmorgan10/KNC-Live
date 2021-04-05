@@ -5,42 +5,20 @@ Run KN-Classify Live
 import os
 import argparse
 
-import knc.process 
-import knc.classify 
+try:
+    import process 
+    import classify
+except ModuleNotFoundError:
+    import sys
+    sys.path.append('knc')
+    import process
+    import classify
 
 class ArgumentError(Exception):
     """
     A class to raise errors for invalid arguments
     """
     pass
-
-def classify_main(args):
-    """
-    Run KNC-Live in classification mode
-
-    Args:
-        args (argpars.Namespace): parsed arguments for classify.py
-    """
-    # Run classification
-    results = knc.classify.classify_datasets(
-        load_classifier(args.datasets_file),
-        args.id_map_file,
-        args.rfc_dir)
-
-    # Save results
-    results.to_csv(f"{args.results_dir}{args.results_outfile}", index=False)
-    
-
-def process_main(args):
-    """
-    Run KNC-Live in processing mode
-
-    Args:
-        args (argpars.Namespace): parsed arguments for process.py
-    """
-
-    # Run data processing
-    knc.process.run_processing(args.lcs_file, args.results_dir)
 
 
 def parse_args() -> argparse.ArgumentParser:
@@ -54,10 +32,10 @@ def parse_args() -> argparse.ArgumentParser:
 
     # Enable command line arguments
     parser.add_argument('--process',
-                        action='store True',
+                        action='store_true',
                         help='Run data processing')
     parser.add_argument('--classify',
-                        action='store True',
+                        action='store_true',
                         help='Run classification')
     parser.add_argument('--lcs_file',
                         type=str,
@@ -92,14 +70,14 @@ if __name__ == '__main__':
 
     # Validate arguments
     if args.process:
-        process_args = knc.process.check_args(parser)
+        process_args = process.check_args(parser)
 
     if args.classify:
-        classify_args = knc.classify.check_args(parser)
+        classify_args = classify.check_args(parser)
 
     # Run scripts
     if args.process:
-        process_main(process_args)
+        process.process_main(process_args)
 
     if args.classify:
-        classify_main(classify_args)
+        classify.classify_main(classify_args)

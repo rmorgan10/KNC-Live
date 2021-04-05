@@ -4,7 +4,7 @@ Extract features from lightcurves
 
 import pandas as pd
 
-from knc.features import FeatureExtractor
+from features import FeatureExtractor
 
 
 def extract(lc : pd.DataFrame,

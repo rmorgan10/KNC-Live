@@ -7,8 +7,13 @@ import os
 import numpy as np
 import pandas as pd
 
-import knc.feature_extraction
+import feature_extraction
 
+class ArgumentError(Exception):
+    """
+    A class to raise errors for invalid arguments
+    """
+    pass
 
 def read_lightcurves(filename : str) -> dict :
     """
@@ -116,10 +121,6 @@ def parse_args() -> argparse.ArgumentParser :
         argparser object
     """
 
-    import argparse
-    
-    from knc.knc import ArgumentError
-
     parser = argparse.ArgumentParser(description=__doc__)
 
     # Enable command line arguments
@@ -145,6 +146,7 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
         The parsed arguments if all arguments are valid
 
     Raises:
+        knc.ArgumentError if lcs_file is not passed as argument
         knc.ArgumentError if lcs_file is not found
         knc.ArgumentError if results_dir cannot be found or created
     """
@@ -152,6 +154,8 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
     args = parser.parse_args()
 
     # Check that the lcs file exists
+    if args.lcs_file is None:
+        raise ArgumentError("Must pass the lcs_file argument in process mode")
     if not os.path.exists(args.lcs_file):
         raise ArgumentError(f"{args.lcs_file} not found")
 
@@ -165,12 +169,21 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
                 raise ArgumentError(f"{args.results_dir} is not valid")    
 
     return args
-            
+
+def process_main(args):
+    """
+    Run KNC-Live in processing mode
+
+    Args:
+        args (argpars.Namespace): parsed arguments for process.py
+    """
+
+    # Run data processing
+    process.run_processing(args.lcs_file, args.results_dir)
+
     
 if __name__ == "__main__":
 
-    from knc.knc import process_main
-    
     # Get and validate command line arguments
     args = check_args(parse_args())
 

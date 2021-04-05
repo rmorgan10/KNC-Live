@@ -33,7 +33,7 @@ Extract features from lightcurves
 
 import pandas as pd
 
-from knc.features import FeatureExtractor
+from features import FeatureExtractor
 
 
 def extract(lc : pd.DataFrame,
@@ -118,7 +118,7 @@ def extract_all(lcs : dict,
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="knc.feature_extraction.extract"><code class="name flex">
-<span>def <span class="ident">extract</span></span>(<span>lc: pandas.core.frame.DataFrame, extractor: <a title="knc.features.FeatureExtractor" href="features.html#knc.features.FeatureExtractor">FeatureExtractor</a>, flts: str = 'griz') ‑> dict</span>
+<span>def <span class="ident">extract</span></span>(<span>lc: pandas.core.frame.DataFrame, extractor: features.FeatureExtractor, flts: str = 'griz') ‑> dict</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Extract features from a single lightcurve</p>

@@ -2,9 +2,17 @@
 Classify datasets
 """
 import argparse
+import os
 
 import numpy as np
 import pandas as pd
+
+
+class ArgumentError(Exception):
+    """
+    A class to raise errors for invalid arguments
+    """
+    pass
 
 def load_classifier(filename : str) -> dict :
     """
@@ -206,14 +214,25 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
 
     return args
 
+def classify_main(args):
+    """
+    Run KNC-Live in classification mode
+
+    Args:
+        args (argpars.Namespace): parsed arguments for classify.py
+    """
+    # Run classification
+    results = classify.classify_datasets(
+        load_classifier(args.datasets_file),
+        args.id_map_file,
+        args.rfc_dir)
+
+    # Save results
+    results.to_csv(f"{args.results_dir}{args.results_outfile}", index=False)
+
+
 if __name__ == "__main__":
     
-    import argparse
-    import os
-
-    from knc.knc import ArgumentError
-    from knc.knc import classify_main
-
     # Get and validate the command line arguments
     args = check_args(parse_args())
 

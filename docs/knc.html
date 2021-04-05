@@ -34,42 +34,20 @@ Run KN-Classify Live
 import os
 import argparse
 
-import knc.process 
-import knc.classify 
+try:
+    import process 
+    import classify
+except ModuleNotFoundError:
+    import sys
+    sys.path.append(&#39;knc&#39;)
+    import process
+    import classify
 
 class ArgumentError(Exception):
     &#34;&#34;&#34;
     A class to raise errors for invalid arguments
     &#34;&#34;&#34;
     pass
-
-def classify_main(args):
-    &#34;&#34;&#34;
-    Run KNC-Live in classification mode
-
-    Args:
-        args (argpars.Namespace): parsed arguments for classify.py
-    &#34;&#34;&#34;
-    # Run classification
-    results = knc.classify.classify_datasets(
-        load_classifier(args.datasets_file),
-        args.id_map_file,
-        args.rfc_dir)
-
-    # Save results
-    results.to_csv(f&#34;{args.results_dir}{args.results_outfile}&#34;, index=False)
-    
-
-def process_main(args):
-    &#34;&#34;&#34;
-    Run KNC-Live in processing mode
-
-    Args:
-        args (argpars.Namespace): parsed arguments for process.py
-    &#34;&#34;&#34;
-
-    # Run data processing
-    knc.process.run_processing(args.lcs_file, args.results_dir)
 
 
 def parse_args() -&gt; argparse.ArgumentParser:
@@ -83,10 +61,10 @@ def parse_args() -&gt; argparse.ArgumentParser:
 
     # Enable command line arguments
     parser.add_argument(&#39;--process&#39;,
-                        action=&#39;store True&#39;,
+                        action=&#39;store_true&#39;,
                         help=&#39;Run data processing&#39;)
     parser.add_argument(&#39;--classify&#39;,
-                        action=&#39;store True&#39;,
+                        action=&#39;store_true&#39;,
                         help=&#39;Run classification&#39;)
     parser.add_argument(&#39;--lcs_file&#39;,
                         type=str,
@@ -121,17 +99,17 @@ if __name__ == &#39;__main__&#39;:
 
     # Validate arguments
     if args.process:
-        process_args = knc.process.check_args(parser)
+        process_args = process.check_args(parser)
 
     if args.classify:
-        classify_args = knc.classify.check_args(parser)
+        classify_args = classify.check_args(parser)
 
     # Run scripts
     if args.process:
-        process_main(process_args)
+        process.process_main(process_args)
 
     if args.classify:
-        classify_main(classify_args)</code></pre>
+        classify.classify_main(classify_args)</code></pre>
 </details>
 </section>
 <section>
@@ -141,37 +119,6 @@ if __name__ == &#39;__main__&#39;:
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
-<dt id="knc.knc.classify_main"><code class="name flex">
-<span>def <span class="ident">classify_main</span></span>(<span>args)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Run KNC-Live in classification mode</p>
-<h2 id="args">Args</h2>
-<dl>
-<dt><strong><code>args</code></strong> :&ensp;<code>argpars.Namespace</code></dt>
-<dd>parsed arguments for classify.py</dd>
-</dl></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def classify_main(args):
-    &#34;&#34;&#34;
-    Run KNC-Live in classification mode
-
-    Args:
-        args (argpars.Namespace): parsed arguments for classify.py
-    &#34;&#34;&#34;
-    # Run classification
-    results = knc.classify.classify_datasets(
-        load_classifier(args.datasets_file),
-        args.id_map_file,
-        args.rfc_dir)
-
-    # Save results
-    results.to_csv(f&#34;{args.results_dir}{args.results_outfile}&#34;, index=False)</code></pre>
-</details>
-</dd>
 <dt id="knc.knc.parse_args"><code class="name flex">
 <span>def <span class="ident">parse_args</span></span>(<span>) ‑> argparse.ArgumentParser</span>
 </code></dt>
@@ -194,10 +141,10 @@ if __name__ == &#39;__main__&#39;:
 
     # Enable command line arguments
     parser.add_argument(&#39;--process&#39;,
-                        action=&#39;store True&#39;,
+                        action=&#39;store_true&#39;,
                         help=&#39;Run data processing&#39;)
     parser.add_argument(&#39;--classify&#39;,
-                        action=&#39;store True&#39;,
+                        action=&#39;store_true&#39;,
                         help=&#39;Run classification&#39;)
     parser.add_argument(&#39;--lcs_file&#39;,
                         type=str,
@@ -223,32 +170,6 @@ if __name__ == &#39;__main__&#39;:
                         default=&#39;id_map.npy&#39;)
 
     return parser</code></pre>
-</details>
-</dd>
-<dt id="knc.knc.process_main"><code class="name flex">
-<span>def <span class="ident">process_main</span></span>(<span>args)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Run KNC-Live in processing mode</p>
-<h2 id="args">Args</h2>
-<dl>
-<dt><strong><code>args</code></strong> :&ensp;<code>argpars.Namespace</code></dt>
-<dd>parsed arguments for process.py</dd>
-</dl></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def process_main(args):
-    &#34;&#34;&#34;
-    Run KNC-Live in processing mode
-
-    Args:
-        args (argpars.Namespace): parsed arguments for process.py
-    &#34;&#34;&#34;
-
-    # Run data processing
-    knc.process.run_processing(args.lcs_file, args.results_dir)</code></pre>
 </details>
 </dd>
 </dl>
@@ -294,9 +215,7 @@ if __name__ == &#39;__main__&#39;:
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
-<li><code><a title="knc.knc.classify_main" href="#knc.knc.classify_main">classify_main</a></code></li>
 <li><code><a title="knc.knc.parse_args" href="#knc.knc.parse_args">parse_args</a></code></li>
-<li><code><a title="knc.knc.process_main" href="#knc.knc.process_main">process_main</a></code></li>
 </ul>
 </li>
 <li><h3><a href="#header-classes">Classes</a></h3>

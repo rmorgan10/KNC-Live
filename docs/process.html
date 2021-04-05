@@ -36,8 +36,13 @@ import os
 import numpy as np
 import pandas as pd
 
-import knc.feature_extraction
+import feature_extraction
 
+class ArgumentError(Exception):
+    &#34;&#34;&#34;
+    A class to raise errors for invalid arguments
+    &#34;&#34;&#34;
+    pass
 
 def read_lightcurves(filename : str) -&gt; dict :
     &#34;&#34;&#34;
@@ -145,10 +150,6 @@ def parse_args() -&gt; argparse.ArgumentParser :
         argparser object
     &#34;&#34;&#34;
 
-    import argparse
-    
-    from knc.knc import ArgumentError
-
     parser = argparse.ArgumentParser(description=__doc__)
 
     # Enable command line arguments
@@ -174,6 +175,7 @@ def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
         The parsed arguments if all arguments are valid
 
     Raises:
+        knc.ArgumentError if lcs_file is not passed as argument
         knc.ArgumentError if lcs_file is not found
         knc.ArgumentError if results_dir cannot be found or created
     &#34;&#34;&#34;
@@ -181,6 +183,8 @@ def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
     args = parser.parse_args()
 
     # Check that the lcs file exists
+    if args.lcs_file is None:
+        raise ArgumentError(&#34;Must pass the lcs_file argument in process mode&#34;)
     if not os.path.exists(args.lcs_file):
         raise ArgumentError(f&#34;{args.lcs_file} not found&#34;)
 
@@ -194,12 +198,21 @@ def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
                 raise ArgumentError(f&#34;{args.results_dir} is not valid&#34;)    
 
     return args
-            
+
+def process_main(args):
+    &#34;&#34;&#34;
+    Run KNC-Live in processing mode
+
+    Args:
+        args (argpars.Namespace): parsed arguments for process.py
+    &#34;&#34;&#34;
+
+    # Run data processing
+    process.run_processing(args.lcs_file, args.results_dir)
+
     
 if __name__ == &#34;__main__&#34;:
 
-    from knc.knc import process_main
-    
     # Get and validate command line arguments
     args = check_args(parse_args())
 
@@ -227,7 +240,8 @@ if __name__ == &#34;__main__&#34;:
 <h2 id="returns">Returns</h2>
 <p>The parsed arguments if all arguments are valid</p>
 <h2 id="raises">Raises</h2>
-<p>knc.ArgumentError if lcs_file is not found
+<p>knc.ArgumentError if lcs_file is not passed as argument
+knc.ArgumentError if lcs_file is not found
 knc.ArgumentError if results_dir cannot be found or created</p></div>
 <details class="source">
 <summary>
@@ -244,6 +258,7 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
         The parsed arguments if all arguments are valid
 
     Raises:
+        knc.ArgumentError if lcs_file is not passed as argument
         knc.ArgumentError if lcs_file is not found
         knc.ArgumentError if results_dir cannot be found or created
     &#34;&#34;&#34;
@@ -251,6 +266,8 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
     args = parser.parse_args()
 
     # Check that the lcs file exists
+    if args.lcs_file is None:
+        raise ArgumentError(&#34;Must pass the lcs_file argument in process mode&#34;)
     if not os.path.exists(args.lcs_file):
         raise ArgumentError(f&#34;{args.lcs_file} not found&#34;)
 
@@ -347,10 +364,6 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
         argparser object
     &#34;&#34;&#34;
 
-    import argparse
-    
-    from knc.knc import ArgumentError
-
     parser = argparse.ArgumentParser(description=__doc__)
 
     # Enable command line arguments
@@ -364,6 +377,32 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
                         default=None)
 
     return parser</code></pre>
+</details>
+</dd>
+<dt id="knc.process.process_main"><code class="name flex">
+<span>def <span class="ident">process_main</span></span>(<span>args)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Run KNC-Live in processing mode</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>args</code></strong> :&ensp;<code>argpars.Namespace</code></dt>
+<dd>parsed arguments for process.py</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def process_main(args):
+    &#34;&#34;&#34;
+    Run KNC-Live in processing mode
+
+    Args:
+        args (argpars.Namespace): parsed arguments for process.py
+    &#34;&#34;&#34;
+
+    # Run data processing
+    process.run_processing(args.lcs_file, args.results_dir)</code></pre>
 </details>
 </dd>
 <dt id="knc.process.read_lightcurves"><code class="name flex">
@@ -470,6 +509,31 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
 </dl>
 </section>
 <section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="knc.process.ArgumentError"><code class="flex name class">
+<span>class <span class="ident">ArgumentError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A class to raise errors for invalid arguments</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ArgumentError(Exception):
+    &#34;&#34;&#34;
+    A class to raise errors for invalid arguments
+    &#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -488,9 +552,17 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
 <li><code><a title="knc.process.check_args" href="#knc.process.check_args">check_args</a></code></li>
 <li><code><a title="knc.process.organize_datasets" href="#knc.process.organize_datasets">organize_datasets</a></code></li>
 <li><code><a title="knc.process.parse_args" href="#knc.process.parse_args">parse_args</a></code></li>
+<li><code><a title="knc.process.process_main" href="#knc.process.process_main">process_main</a></code></li>
 <li><code><a title="knc.process.read_lightcurves" href="#knc.process.read_lightcurves">read_lightcurves</a></code></li>
 <li><code><a title="knc.process.run_processing" href="#knc.process.run_processing">run_processing</a></code></li>
 <li><code><a title="knc.process.save_datasets" href="#knc.process.save_datasets">save_datasets</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="knc.process.ArgumentError" href="#knc.process.ArgumentError">ArgumentError</a></code></h4>
+</li>
 </ul>
 </li>
 </ul>
