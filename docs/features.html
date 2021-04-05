@@ -40,7 +40,7 @@ class FeatureExtractor():
     &#34;&#34;&#34;
     def __init__(self):
         # Establish feature families
-        self.features = [x for x in dir(self) if x[0:2] != &#39;__&#39;]
+        self.features = [x for x in dir(self) if x[0:1] != &#39;_&#39;]
         self.families = [&#39;nobs_brighter_than&#39;,
                          &#39;slope&#39;,
                          &#39;same_nite_color_diff&#39;,
@@ -64,8 +64,7 @@ class FeatureExtractor():
 
 
     # Family 1: Nobs bright than
-    @staticmethod
-    def __family1(lc, flt, threshold):
+    def __family1(self, lc, flt, threshold):
         mag_arr = self.__get_mags(lc, flt)
         if len(mag_arr) &gt; 0:
             return sum((mag_arr &lt; threshold))
@@ -100,10 +99,10 @@ class FeatureExtractor():
     def nobs_brighter_than_22(self, lc, flt1, flt2=None):
         return self.__family1(lc, flt1, 22.0)
     
-    def nobs_brighter_than_225(self, lc, md, flt1, flt2=None):
+    def nobs_brighter_than_225(self, lc, flt1, flt2=None):
         return self.__family1(lc, flt1, 22.5)
 
-    def nobs_brighter_than_23(self, lc, md, flt1, flt2=None):
+    def nobs_brighter_than_23(self, lc, flt1, flt2=None):
         return self.__family1(lc, flt1, 23.0)
 
     def nobs_brighter_than_17_any_flt(self, lc, flt1, flt2=None):
@@ -144,8 +143,8 @@ class FeatureExtractor():
             return lc[&#39;MJD&#39;].values[lc[&#39;FLT&#39;].values == flt].astype(float)
 
     def slope_average(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             if mjds[-1] != mjds[0]:
                 return (mags[-1] - mags[0]) / (mjds[-1] - mjds[0])
@@ -155,32 +154,32 @@ class FeatureExtractor():
             return &#39;N&#39;
             
     def slope_max(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             return np.max(np.diff(mags) / np.diff(mjds))
         else:
             return &#39;N&#39;
 
     def slope_min(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             return np.min(np.diff(mags) / np.diff(mjds))
         else:
             return &#39;N&#39;
 
     def slope_mjd_of_max(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             return mjds[np.argmax(np.diff(mags) / np.diff(mjds))]
         else:
             return &#39;N&#39;
 
-    def slope_mjd_of_min(self, lc, md, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+    def slope_mjd_of_min(self, lc, flt1, flt2=None):
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             return mjds[np.argmin(np.diff(mags) / np.diff(mjds))]
         else:
@@ -188,8 +187,7 @@ class FeatureExtractor():
 
 
     # Family 3: Same night color difference
-    @staticmethod
-    def __get_nite_color(lc, flt1, flt2):
+    def __get_nite_color(self, lc, flt1, flt2):
         lc[&#39;NITE&#39;] = lc[&#39;MJD&#39;].values.astype(float).round().astype(int)
         nites = lc.groupby(&#39;NITE&#39;)
         colors = []
@@ -292,7 +290,7 @@ class FeatureExtractor():
         if len(flux) == 0:
             return &#39;N&#39;
         else:
-            return lc[&#39;MJD&#39;].values[np.argmax(flux / fluxerrs)]
+            return lc[&#39;MJD&#39;].values[np.argmax(flux / fluxerr)]
 
 
     # Family 6: Flat line fitting
@@ -465,7 +463,7 @@ class FeatureExtractor():
     &#34;&#34;&#34;
     def __init__(self):
         # Establish feature families
-        self.features = [x for x in dir(self) if x[0:2] != &#39;__&#39;]
+        self.features = [x for x in dir(self) if x[0:1] != &#39;_&#39;]
         self.families = [&#39;nobs_brighter_than&#39;,
                          &#39;slope&#39;,
                          &#39;same_nite_color_diff&#39;,
@@ -489,8 +487,7 @@ class FeatureExtractor():
 
 
     # Family 1: Nobs bright than
-    @staticmethod
-    def __family1(lc, flt, threshold):
+    def __family1(self, lc, flt, threshold):
         mag_arr = self.__get_mags(lc, flt)
         if len(mag_arr) &gt; 0:
             return sum((mag_arr &lt; threshold))
@@ -525,10 +522,10 @@ class FeatureExtractor():
     def nobs_brighter_than_22(self, lc, flt1, flt2=None):
         return self.__family1(lc, flt1, 22.0)
     
-    def nobs_brighter_than_225(self, lc, md, flt1, flt2=None):
+    def nobs_brighter_than_225(self, lc, flt1, flt2=None):
         return self.__family1(lc, flt1, 22.5)
 
-    def nobs_brighter_than_23(self, lc, md, flt1, flt2=None):
+    def nobs_brighter_than_23(self, lc, flt1, flt2=None):
         return self.__family1(lc, flt1, 23.0)
 
     def nobs_brighter_than_17_any_flt(self, lc, flt1, flt2=None):
@@ -569,8 +566,8 @@ class FeatureExtractor():
             return lc[&#39;MJD&#39;].values[lc[&#39;FLT&#39;].values == flt].astype(float)
 
     def slope_average(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             if mjds[-1] != mjds[0]:
                 return (mags[-1] - mags[0]) / (mjds[-1] - mjds[0])
@@ -580,32 +577,32 @@ class FeatureExtractor():
             return &#39;N&#39;
             
     def slope_max(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             return np.max(np.diff(mags) / np.diff(mjds))
         else:
             return &#39;N&#39;
 
     def slope_min(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             return np.min(np.diff(mags) / np.diff(mjds))
         else:
             return &#39;N&#39;
 
     def slope_mjd_of_max(self, lc, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             return mjds[np.argmax(np.diff(mags) / np.diff(mjds))]
         else:
             return &#39;N&#39;
 
-    def slope_mjd_of_min(self, lc, md, flt1, flt2=None):
-        mags = self.get_mags(lc, flt1)
-        mjds = self.get_mjds(lc, flt1)
+    def slope_mjd_of_min(self, lc, flt1, flt2=None):
+        mags = self.__get_mags(lc, flt1)
+        mjds = self.__get_mjds(lc, flt1)
         if len(mags) &gt; 1:
             return mjds[np.argmin(np.diff(mags) / np.diff(mjds))]
         else:
@@ -613,8 +610,7 @@ class FeatureExtractor():
 
 
     # Family 3: Same night color difference
-    @staticmethod
-    def __get_nite_color(lc, flt1, flt2):
+    def __get_nite_color(self, lc, flt1, flt2):
         lc[&#39;NITE&#39;] = lc[&#39;MJD&#39;].values.astype(float).round().astype(int)
         nites = lc.groupby(&#39;NITE&#39;)
         colors = []
@@ -717,7 +713,7 @@ class FeatureExtractor():
         if len(flux) == 0:
             return &#39;N&#39;
         else:
-            return lc[&#39;MJD&#39;].values[np.argmax(flux / fluxerrs)]
+            return lc[&#39;MJD&#39;].values[np.argmax(flux / fluxerr)]
 
 
     # Family 6: Flat line fitting
@@ -1332,7 +1328,7 @@ class FeatureExtractor():
 </details>
 </dd>
 <dt id="knc.features.FeatureExtractor.nobs_brighter_than_225"><code class="name flex">
-<span>def <span class="ident">nobs_brighter_than_225</span></span>(<span>self, lc, md, flt1, flt2=None)</span>
+<span>def <span class="ident">nobs_brighter_than_225</span></span>(<span>self, lc, flt1, flt2=None)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -1340,7 +1336,7 @@ class FeatureExtractor():
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def nobs_brighter_than_225(self, lc, md, flt1, flt2=None):
+<pre><code class="python">def nobs_brighter_than_225(self, lc, flt1, flt2=None):
     return self.__family1(lc, flt1, 22.5)</code></pre>
 </details>
 </dd>
@@ -1371,7 +1367,7 @@ class FeatureExtractor():
 </details>
 </dd>
 <dt id="knc.features.FeatureExtractor.nobs_brighter_than_23"><code class="name flex">
-<span>def <span class="ident">nobs_brighter_than_23</span></span>(<span>self, lc, md, flt1, flt2=None)</span>
+<span>def <span class="ident">nobs_brighter_than_23</span></span>(<span>self, lc, flt1, flt2=None)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -1379,7 +1375,7 @@ class FeatureExtractor():
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def nobs_brighter_than_23(self, lc, md, flt1, flt2=None):
+<pre><code class="python">def nobs_brighter_than_23(self, lc, flt1, flt2=None):
     return self.__family1(lc, flt1, 23.0)</code></pre>
 </details>
 </dd>
@@ -1457,8 +1453,8 @@ class FeatureExtractor():
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def slope_average(self, lc, flt1, flt2=None):
-    mags = self.get_mags(lc, flt1)
-    mjds = self.get_mjds(lc, flt1)
+    mags = self.__get_mags(lc, flt1)
+    mjds = self.__get_mjds(lc, flt1)
     if len(mags) &gt; 1:
         if mjds[-1] != mjds[0]:
             return (mags[-1] - mags[0]) / (mjds[-1] - mjds[0])
@@ -1478,8 +1474,8 @@ class FeatureExtractor():
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def slope_max(self, lc, flt1, flt2=None):
-    mags = self.get_mags(lc, flt1)
-    mjds = self.get_mjds(lc, flt1)
+    mags = self.__get_mags(lc, flt1)
+    mjds = self.__get_mjds(lc, flt1)
     if len(mags) &gt; 1:
         return np.max(np.diff(mags) / np.diff(mjds))
     else:
@@ -1496,8 +1492,8 @@ class FeatureExtractor():
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def slope_min(self, lc, flt1, flt2=None):
-    mags = self.get_mags(lc, flt1)
-    mjds = self.get_mjds(lc, flt1)
+    mags = self.__get_mags(lc, flt1)
+    mjds = self.__get_mjds(lc, flt1)
     if len(mags) &gt; 1:
         return np.min(np.diff(mags) / np.diff(mjds))
     else:
@@ -1514,8 +1510,8 @@ class FeatureExtractor():
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def slope_mjd_of_max(self, lc, flt1, flt2=None):
-    mags = self.get_mags(lc, flt1)
-    mjds = self.get_mjds(lc, flt1)
+    mags = self.__get_mags(lc, flt1)
+    mjds = self.__get_mjds(lc, flt1)
     if len(mags) &gt; 1:
         return mjds[np.argmax(np.diff(mags) / np.diff(mjds))]
     else:
@@ -1523,7 +1519,7 @@ class FeatureExtractor():
 </details>
 </dd>
 <dt id="knc.features.FeatureExtractor.slope_mjd_of_min"><code class="name flex">
-<span>def <span class="ident">slope_mjd_of_min</span></span>(<span>self, lc, md, flt1, flt2=None)</span>
+<span>def <span class="ident">slope_mjd_of_min</span></span>(<span>self, lc, flt1, flt2=None)</span>
 </code></dt>
 <dd>
 <div class="desc"></div>
@@ -1531,9 +1527,9 @@ class FeatureExtractor():
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def slope_mjd_of_min(self, lc, md, flt1, flt2=None):
-    mags = self.get_mags(lc, flt1)
-    mjds = self.get_mjds(lc, flt1)
+<pre><code class="python">def slope_mjd_of_min(self, lc, flt1, flt2=None):
+    mags = self.__get_mags(lc, flt1)
+    mjds = self.__get_mjds(lc, flt1)
     if len(mags) &gt; 1:
         return mjds[np.argmin(np.diff(mags) / np.diff(mjds))]
     else:
@@ -1588,7 +1584,7 @@ class FeatureExtractor():
     if len(flux) == 0:
         return &#39;N&#39;
     else:
-        return lc[&#39;MJD&#39;].values[np.argmax(flux / fluxerrs)]</code></pre>
+        return lc[&#39;MJD&#39;].values[np.argmax(flux / fluxerr)]</code></pre>
 </details>
 </dd>
 <dt id="knc.features.FeatureExtractor.total_color_diff_max_max"><code class="name flex">

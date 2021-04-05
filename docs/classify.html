@@ -30,6 +30,7 @@
 <pre><code class="python">&#34;&#34;&#34;
 Classify datasets
 &#34;&#34;&#34;
+import argparse
 
 import numpy as np
 import pandas as pd
@@ -46,7 +47,7 @@ def load_classifier(filename : str) -&gt; dict :
     &#34;&#34;&#34;
     return np.load(filename, allow_pickle=True).item()
 
-def calibrate(scores: np.array) -&gt; np.array :
+def calibrate(scores: np.ndarray) -&gt; np.ndarray :
     &#34;&#34;&#34;
     Transform output scores into probabilities
 
@@ -61,6 +62,20 @@ def calibrate(scores: np.array) -&gt; np.array :
     
     popt = [2.66766158e-05, 2.66362041e-05, 3.94224999e+01]
     return sigmoid(scores, *popt)
+
+def clean_data(df : pd.DataFrame) -&gt; pd.DataFrame :
+    &#34;&#34;&#34;
+    Remove inf and NaNs from data
+
+    Args:
+        df (pd.DataFrame): featurized data
+
+    Returns:
+        df without rows containing infs and NaNs
+    &#34;&#34;&#34;
+    nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
+    df = df.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
+    return df.reset_index(drop=True)
     
 
 def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
@@ -80,7 +95,160 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
     scores = rfc.predict_proba(data[feats])[:,1]
     data[&#39;PROB_KN&#39;] = calibrate(scores)
 
-    return data</code></pre>
+    return data
+
+
+def get_classifier_filename(dataset_id : str,
+                            id_map_file : str = &#39;id_map.npy&#39;,
+                            rfc_dir : str = &#39;classifiers/&#39;) -&gt; str:
+    &#34;&#34;&#34;
+    Given a classifier ID, return the filepath to the classifier
+
+    Args:
+        dataset_id (str): ID string for the dataset
+        id_map_file (str, default=&#39;id_map.npy&#39;): path to map of classifier ids
+        rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+
+    Returns:
+        filename of the classifier
+    &#34;&#34;&#34;
+    if not rfc_dir.endswith(&#39;/&#39;):
+        rfc_dir += &#39;/&#39;
+
+    id_map = load_classifier(f&#34;{rfc_dir}{id_map_file}&#34;)
+    key = id_map[dataset_id]
+
+    return f&#34;{rfc_dir}knclassifier_{key}.npy&#34;
+    
+
+def classify_datasets(data_dict : dict,
+                      id_map_file : str = &#39;id_map.npy&#39;,
+                      rfc_dir : str = &#39;classifiers/&#39;) -&gt; pd.DataFrame :
+    &#34;&#34;&#34;
+    For each dataset, load the corresponding classifier and predict
+
+    Args:
+        data_dict (dict): dictionary containing all datasets
+        id_map_file (str, default=&#39;id_map.npy&#39;): path to map of classifier ids
+        rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+
+    Returns:
+        DataFrame with columns SNID and PROB_KN
+    &#34;&#34;&#34;
+    classified_data = []
+    for dataset_id, df in data_dict.items():
+        # Load classifier corresponding to dataset
+        try:
+            classifier_name = get_classifier_filename(
+                dataset_id, id_map_file, rfc_dir)
+            
+        except KeyError:
+            print(&#34;WARNING: KNC-Live is not trained for some of the data&#34;)
+            continue
+
+        # Load classifier
+        classifier_dict = load_classifier(classifier_name)
+        
+        # Remove rows with infs and NaNs
+        clean_df = clean_data(df)
+
+        # Apply the classifier
+        res = predict(classifier_dict, clean_df)
+        classified_data += [(x, y) for x, y in zip(res[&#39;SNID&#39;].values,
+                                                   res[&#39;PROB_KN&#39;].values)]
+
+    return pd.DataFrame(data=classified_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;])
+
+
+def parse_args() -&gt; argparse.ArgumentParser:
+    &#34;&#34;&#34;
+    Parse command line arguments to enable script-like classifying
+
+    Returns:
+        arrgparser object
+    &#34;&#34;&#34;
+    parser = argparse.ArgumentParser(description=__doc__)
+
+    # Enable command line arguments
+    parser.add_argument(&#39;--datasets_file&#39;,
+                        type=str,
+                        help=&#39;Path to datasets file&#39;,
+                        required=True)
+    parser.add_argument(&#39;--results_outfile&#39;,
+                        type=str,
+                        help=&#39;Filename to store results&#39;,
+                        default=&#39;KNC-Live_Results.csv&#39;)
+    parser.add_argument(&#39;--results_dir&#39;,
+                        type=str,
+                        help=&#39;Directory to save results&#39;,
+                        default=None)
+    parser.add_argument(&#39;--rfc_dir&#39;,
+                        type=str,
+                        help=&#39;Path to directory containing classifiers&#39;,
+                        default=&#39;classifiers/&#39;)
+    parser.add_argument(&#39;--id_map_file&#39;,
+                        type=str,
+                        help=&#39;Name of ID map file in classifier directory&#39;,
+                        default=&#39;id_map.npy&#39;)
+
+    return parser
+
+def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
+    &#34;&#34;&#34;
+    Check the arguments for invalid values
+
+    Args:
+        parser (argparse.ArgumentParser): a parser object
+    
+    Returns:
+        The parsed arguments if all arguments are valid
+
+    Raises:
+        knc.ArgumentError if rfc_dir is not found
+        knc.ArgumentError if id_map_file is not found
+        knc.ArgumentError if datasets_file is not found
+        knc.ArgumentError if results_dir cannot be found or created
+    &#34;&#34;&#34;
+    args = parser.parse_args()
+
+    # Check the the classifiers directory exists
+    if not os.path.exists(args.rfc_dir):
+        raise ArgumentError(f&#34;{args.rfc_dir} not found&#34;)
+    if not args.rfc_dir.endswith(&#39;/&#39;):
+        args.rfc_dir += &#39;/&#39;
+    
+    # Check that the needed files exist
+    for filename in [args.datasets_file, args.rfc_dir + args.id_map_file]:
+        if not os.path.exists(filename):
+            raise ArgumentError(f&#34;{filename} not found&#34;)
+
+    # Check that the results directory can be made or exists
+    if args.results_dir is not None:
+        if not os.path.exists(args.results_dir):
+            
+            try:
+                os.mkdir(results_dir)
+            except FileNotFoundError:
+                raise ArgumentError(f&#34;{args.results_dir} is not valid&#34;)
+    else:
+        args.results_dir = os.getcwd()
+
+    return args
+
+if __name__ == &#34;__main__&#34;:
+    
+    import argparse
+    import os
+
+    from knc.knc import ArgumentError
+    from knc.knc import classify_main
+
+    # Get and validate the command line arguments
+    args = check_args(parse_args())
+
+    # Run classification and save results
+    classify_main(args)
+    </code></pre>
 </details>
 </section>
 <section>
@@ -91,7 +259,7 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="knc.classify.calibrate"><code class="name flex">
-<span>def <span class="ident">calibrate</span></span>(<span>scores: <built-in function array>) ‑> <built-in function array></span>
+<span>def <span class="ident">calibrate</span></span>(<span>scores: numpy.ndarray) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform output scores into probabilities</p>
@@ -106,7 +274,7 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def calibrate(scores: np.array) -&gt; np.array :
+<pre><code class="python">def calibrate(scores: np.ndarray) -&gt; np.ndarray :
     &#34;&#34;&#34;
     Transform output scores into probabilities
 
@@ -121,6 +289,199 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
     
     popt = [2.66766158e-05, 2.66362041e-05, 3.94224999e+01]
     return sigmoid(scores, *popt)</code></pre>
+</details>
+</dd>
+<dt id="knc.classify.check_args"><code class="name flex">
+<span>def <span class="ident">check_args</span></span>(<span>parser: argparse.ArgumentParser) ‑> argparse.Namespace</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Check the arguments for invalid values</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>parser</code></strong> :&ensp;<code>argparse.ArgumentParser</code></dt>
+<dd>a parser object</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>The parsed arguments if all arguments are valid</p>
+<h2 id="raises">Raises</h2>
+<p>knc.ArgumentError if rfc_dir is not found
+knc.ArgumentError if id_map_file is not found
+knc.ArgumentError if datasets_file is not found
+knc.ArgumentError if results_dir cannot be found or created</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
+    &#34;&#34;&#34;
+    Check the arguments for invalid values
+
+    Args:
+        parser (argparse.ArgumentParser): a parser object
+    
+    Returns:
+        The parsed arguments if all arguments are valid
+
+    Raises:
+        knc.ArgumentError if rfc_dir is not found
+        knc.ArgumentError if id_map_file is not found
+        knc.ArgumentError if datasets_file is not found
+        knc.ArgumentError if results_dir cannot be found or created
+    &#34;&#34;&#34;
+    args = parser.parse_args()
+
+    # Check the the classifiers directory exists
+    if not os.path.exists(args.rfc_dir):
+        raise ArgumentError(f&#34;{args.rfc_dir} not found&#34;)
+    if not args.rfc_dir.endswith(&#39;/&#39;):
+        args.rfc_dir += &#39;/&#39;
+    
+    # Check that the needed files exist
+    for filename in [args.datasets_file, args.rfc_dir + args.id_map_file]:
+        if not os.path.exists(filename):
+            raise ArgumentError(f&#34;{filename} not found&#34;)
+
+    # Check that the results directory can be made or exists
+    if args.results_dir is not None:
+        if not os.path.exists(args.results_dir):
+            
+            try:
+                os.mkdir(results_dir)
+            except FileNotFoundError:
+                raise ArgumentError(f&#34;{args.results_dir} is not valid&#34;)
+    else:
+        args.results_dir = os.getcwd()
+
+    return args</code></pre>
+</details>
+</dd>
+<dt id="knc.classify.classify_datasets"><code class="name flex">
+<span>def <span class="ident">classify_datasets</span></span>(<span>data_dict: dict, id_map_file: str = 'id_map.npy', rfc_dir: str = 'classifiers/') ‑> pandas.core.frame.DataFrame</span>
+</code></dt>
+<dd>
+<div class="desc"><p>For each dataset, load the corresponding classifier and predict</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>data_dict</code></strong> :&ensp;<code>dict</code></dt>
+<dd>dictionary containing all datasets</dd>
+</dl>
+<p>id_map_file (str, default='id_map.npy'): path to map of classifier ids
+rfc_dir (str, default='classifiers/'): path to classifier directory</p>
+<h2 id="returns">Returns</h2>
+<p>DataFrame with columns SNID and PROB_KN</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def classify_datasets(data_dict : dict,
+                      id_map_file : str = &#39;id_map.npy&#39;,
+                      rfc_dir : str = &#39;classifiers/&#39;) -&gt; pd.DataFrame :
+    &#34;&#34;&#34;
+    For each dataset, load the corresponding classifier and predict
+
+    Args:
+        data_dict (dict): dictionary containing all datasets
+        id_map_file (str, default=&#39;id_map.npy&#39;): path to map of classifier ids
+        rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+
+    Returns:
+        DataFrame with columns SNID and PROB_KN
+    &#34;&#34;&#34;
+    classified_data = []
+    for dataset_id, df in data_dict.items():
+        # Load classifier corresponding to dataset
+        try:
+            classifier_name = get_classifier_filename(
+                dataset_id, id_map_file, rfc_dir)
+            
+        except KeyError:
+            print(&#34;WARNING: KNC-Live is not trained for some of the data&#34;)
+            continue
+
+        # Load classifier
+        classifier_dict = load_classifier(classifier_name)
+        
+        # Remove rows with infs and NaNs
+        clean_df = clean_data(df)
+
+        # Apply the classifier
+        res = predict(classifier_dict, clean_df)
+        classified_data += [(x, y) for x, y in zip(res[&#39;SNID&#39;].values,
+                                                   res[&#39;PROB_KN&#39;].values)]
+
+    return pd.DataFrame(data=classified_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;])</code></pre>
+</details>
+</dd>
+<dt id="knc.classify.clean_data"><code class="name flex">
+<span>def <span class="ident">clean_data</span></span>(<span>df: pandas.core.frame.DataFrame) ‑> pandas.core.frame.DataFrame</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Remove inf and NaNs from data</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>featurized data</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>df without rows containing infs and NaNs</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def clean_data(df : pd.DataFrame) -&gt; pd.DataFrame :
+    &#34;&#34;&#34;
+    Remove inf and NaNs from data
+
+    Args:
+        df (pd.DataFrame): featurized data
+
+    Returns:
+        df without rows containing infs and NaNs
+    &#34;&#34;&#34;
+    nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
+    df = df.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
+    return df.reset_index(drop=True)</code></pre>
+</details>
+</dd>
+<dt id="knc.classify.get_classifier_filename"><code class="name flex">
+<span>def <span class="ident">get_classifier_filename</span></span>(<span>dataset_id: str, id_map_file: str = 'id_map.npy', rfc_dir: str = 'classifiers/') ‑> str</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Given a classifier ID, return the filepath to the classifier</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>dataset_id</code></strong> :&ensp;<code>str</code></dt>
+<dd>ID string for the dataset</dd>
+</dl>
+<p>id_map_file (str, default='id_map.npy'): path to map of classifier ids
+rfc_dir (str, default='classifiers/'): path to classifier directory</p>
+<h2 id="returns">Returns</h2>
+<p>filename of the classifier</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def get_classifier_filename(dataset_id : str,
+                            id_map_file : str = &#39;id_map.npy&#39;,
+                            rfc_dir : str = &#39;classifiers/&#39;) -&gt; str:
+    &#34;&#34;&#34;
+    Given a classifier ID, return the filepath to the classifier
+
+    Args:
+        dataset_id (str): ID string for the dataset
+        id_map_file (str, default=&#39;id_map.npy&#39;): path to map of classifier ids
+        rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+
+    Returns:
+        filename of the classifier
+    &#34;&#34;&#34;
+    if not rfc_dir.endswith(&#39;/&#39;):
+        rfc_dir += &#39;/&#39;
+
+    id_map = load_classifier(f&#34;{rfc_dir}{id_map_file}&#34;)
+    key = id_map[dataset_id]
+
+    return f&#34;{rfc_dir}knclassifier_{key}.npy&#34;</code></pre>
 </details>
 </dd>
 <dt id="knc.classify.load_classifier"><code class="name flex">
@@ -150,6 +511,51 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
         dictionary of classifier and features to use
     &#34;&#34;&#34;
     return np.load(filename, allow_pickle=True).item()</code></pre>
+</details>
+</dd>
+<dt id="knc.classify.parse_args"><code class="name flex">
+<span>def <span class="ident">parse_args</span></span>(<span>) ‑> argparse.ArgumentParser</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Parse command line arguments to enable script-like classifying</p>
+<h2 id="returns">Returns</h2>
+<p>arrgparser object</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def parse_args() -&gt; argparse.ArgumentParser:
+    &#34;&#34;&#34;
+    Parse command line arguments to enable script-like classifying
+
+    Returns:
+        arrgparser object
+    &#34;&#34;&#34;
+    parser = argparse.ArgumentParser(description=__doc__)
+
+    # Enable command line arguments
+    parser.add_argument(&#39;--datasets_file&#39;,
+                        type=str,
+                        help=&#39;Path to datasets file&#39;,
+                        required=True)
+    parser.add_argument(&#39;--results_outfile&#39;,
+                        type=str,
+                        help=&#39;Filename to store results&#39;,
+                        default=&#39;KNC-Live_Results.csv&#39;)
+    parser.add_argument(&#39;--results_dir&#39;,
+                        type=str,
+                        help=&#39;Directory to save results&#39;,
+                        default=None)
+    parser.add_argument(&#39;--rfc_dir&#39;,
+                        type=str,
+                        help=&#39;Path to directory containing classifiers&#39;,
+                        default=&#39;classifiers/&#39;)
+    parser.add_argument(&#39;--id_map_file&#39;,
+                        type=str,
+                        help=&#39;Name of ID map file in classifier directory&#39;,
+                        default=&#39;id_map.npy&#39;)
+
+    return parser</code></pre>
 </details>
 </dd>
 <dt id="knc.classify.predict"><code class="name flex">
@@ -209,7 +615,12 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
 <li><code><a title="knc.classify.calibrate" href="#knc.classify.calibrate">calibrate</a></code></li>
+<li><code><a title="knc.classify.check_args" href="#knc.classify.check_args">check_args</a></code></li>
+<li><code><a title="knc.classify.classify_datasets" href="#knc.classify.classify_datasets">classify_datasets</a></code></li>
+<li><code><a title="knc.classify.clean_data" href="#knc.classify.clean_data">clean_data</a></code></li>
+<li><code><a title="knc.classify.get_classifier_filename" href="#knc.classify.get_classifier_filename">get_classifier_filename</a></code></li>
 <li><code><a title="knc.classify.load_classifier" href="#knc.classify.load_classifier">load_classifier</a></code></li>
+<li><code><a title="knc.classify.parse_args" href="#knc.classify.parse_args">parse_args</a></code></li>
 <li><code><a title="knc.classify.predict" href="#knc.classify.predict">predict</a></code></li>
 </ul>
 </li>

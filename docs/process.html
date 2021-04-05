@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
 <meta name="generator" content="pdoc 0.9.2" />
-<title>knc.data_processing API documentation</title>
+<title>knc.process API documentation</title>
 <meta name="description" content="Functionalities to process a lightcurve file for KN-Classify" />
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
 <link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
@@ -19,7 +19,7 @@
 <main>
 <article id="content">
 <header>
-<h1 class="title">Module <code>knc.data_processing</code></h1>
+<h1 class="title">Module <code>knc.process</code></h1>
 </header>
 <section id="section-intro">
 <p>Functionalities to process a lightcurve file for KN-Classify</p>
@@ -30,6 +30,7 @@
 <pre><code class="python">&#34;&#34;&#34;
 Functionalities to process a lightcurve file for KN-Classify
 &#34;&#34;&#34;
+import argparse
 import os
 
 import numpy as np
@@ -136,15 +137,17 @@ def run_processing(lcs_file : str, results_dir : str = None):
     save_datasets(f&#39;{results_dir}/KNC_datasets.npy&#39;, datasets)
 
 
-if __name__ == &#34;__main__&#34;:
-    class ArgumentError(Exception):
-        &#34;&#34;&#34;
-        A class to raise errors for invalid arguments
-        &#34;&#34;&#34;
-        pass
+def parse_args() -&gt; argparse.ArgumentParser :
+    &#34;&#34;&#34;
+    Parse command line arguments to enable script-like data processing
     
-    
+    Returns:
+        argparser object
+    &#34;&#34;&#34;
+
     import argparse
+    
+    from knc.knc import ArgumentError
 
     parser = argparse.ArgumentParser(description=__doc__)
 
@@ -157,6 +160,24 @@ if __name__ == &#34;__main__&#34;:
                         type=str,
                         help=&#39;Directory to save results&#39;,
                         default=None)
+
+    return parser
+
+def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
+    &#34;&#34;&#34;
+    Check the arguments for invalid values
+
+    Args:
+        parser (argparse.ArgumentParser): a parser object
+    
+    Returns:
+        The parsed arguments if all arguments are valid
+
+    Raises:
+        knc.ArgumentError if lcs_file is not found
+        knc.ArgumentError if results_dir cannot be found or created
+    &#34;&#34;&#34;
+
     args = parser.parse_args()
 
     # Check that the lcs file exists
@@ -170,11 +191,20 @@ if __name__ == &#34;__main__&#34;:
             try:
                 os.mkdir(results_dir)
             except FileNotFoundError:
-                raise ArgumentError(f&#34;{args.results_dir} is not valid&#34;)
+                raise ArgumentError(f&#34;{args.results_dir} is not valid&#34;)    
 
+    return args
+            
+    
+if __name__ == &#34;__main__&#34;:
+
+    from knc.knc import process_main
+    
+    # Get and validate command line arguments
+    args = check_args(parse_args())
 
     # Run data processing
-    run_processing(args.lcs_file, args.results_dir)</code></pre>
+    process_main(args)</code></pre>
 </details>
 </section>
 <section>
@@ -184,7 +214,59 @@ if __name__ == &#34;__main__&#34;:
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
-<dt id="knc.data_processing.organize_datasets"><code class="name flex">
+<dt id="knc.process.check_args"><code class="name flex">
+<span>def <span class="ident">check_args</span></span>(<span>parser: argparse.ArgumentParser) ‑> argparse.Namespace</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Check the arguments for invalid values</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>parser</code></strong> :&ensp;<code>argparse.ArgumentParser</code></dt>
+<dd>a parser object</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>The parsed arguments if all arguments are valid</p>
+<h2 id="raises">Raises</h2>
+<p>knc.ArgumentError if lcs_file is not found
+knc.ArgumentError if results_dir cannot be found or created</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
+    &#34;&#34;&#34;
+    Check the arguments for invalid values
+
+    Args:
+        parser (argparse.ArgumentParser): a parser object
+    
+    Returns:
+        The parsed arguments if all arguments are valid
+
+    Raises:
+        knc.ArgumentError if lcs_file is not found
+        knc.ArgumentError if results_dir cannot be found or created
+    &#34;&#34;&#34;
+
+    args = parser.parse_args()
+
+    # Check that the lcs file exists
+    if not os.path.exists(args.lcs_file):
+        raise ArgumentError(f&#34;{args.lcs_file} not found&#34;)
+
+    # Check that the results directory can be made or exists
+    if args.results_dir is not None:
+        if not os.path.exists(args.results_dir):
+            
+            try:
+                os.mkdir(results_dir)
+            except FileNotFoundError:
+                raise ArgumentError(f&#34;{args.results_dir} is not valid&#34;)    
+
+    return args</code></pre>
+</details>
+</dd>
+<dt id="knc.process.organize_datasets"><code class="name flex">
 <span>def <span class="ident">organize_datasets</span></span>(<span>df: pandas.core.frame.DataFrame) ‑> dict</span>
 </code></dt>
 <dd>
@@ -246,7 +328,45 @@ if __name__ == &#34;__main__&#34;:
     return datasets</code></pre>
 </details>
 </dd>
-<dt id="knc.data_processing.read_lightcurves"><code class="name flex">
+<dt id="knc.process.parse_args"><code class="name flex">
+<span>def <span class="ident">parse_args</span></span>(<span>) ‑> argparse.ArgumentParser</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Parse command line arguments to enable script-like data processing</p>
+<h2 id="returns">Returns</h2>
+<p>argparser object</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def parse_args() -&gt; argparse.ArgumentParser :
+    &#34;&#34;&#34;
+    Parse command line arguments to enable script-like data processing
+    
+    Returns:
+        argparser object
+    &#34;&#34;&#34;
+
+    import argparse
+    
+    from knc.knc import ArgumentError
+
+    parser = argparse.ArgumentParser(description=__doc__)
+
+    # Enable command line arguments
+    parser.add_argument(&#39;--lcs_file&#39;,
+                        type=str,
+                        help=&#39;Path to lightcurve file&#39;,
+                        required=True)
+    parser.add_argument(&#39;--results_dir&#39;,
+                        type=str,
+                        help=&#39;Directory to save results&#39;,
+                        default=None)
+
+    return parser</code></pre>
+</details>
+</dd>
+<dt id="knc.process.read_lightcurves"><code class="name flex">
 <span>def <span class="ident">read_lightcurves</span></span>(<span>filename: str) ‑> dict</span>
 </code></dt>
 <dd>
@@ -275,7 +395,7 @@ if __name__ == &#34;__main__&#34;:
     return np.load(filename).item()</code></pre>
 </details>
 </dd>
-<dt id="knc.data_processing.run_processing"><code class="name flex">
+<dt id="knc.process.run_processing"><code class="name flex">
 <span>def <span class="ident">run_processing</span></span>(<span>lcs_file: str, results_dir: str = None)</span>
 </code></dt>
 <dd>
@@ -320,7 +440,7 @@ if __name__ == &#34;__main__&#34;:
     save_datasets(f&#39;{results_dir}/KNC_datasets.npy&#39;, datasets)</code></pre>
 </details>
 </dd>
-<dt id="knc.data_processing.save_datasets"><code class="name flex">
+<dt id="knc.process.save_datasets"><code class="name flex">
 <span>def <span class="ident">save_datasets</span></span>(<span>outfile: str, datasets: dict)</span>
 </code></dt>
 <dd>
@@ -364,11 +484,13 @@ if __name__ == &#34;__main__&#34;:
 </ul>
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
-<ul class="">
-<li><code><a title="knc.data_processing.organize_datasets" href="#knc.data_processing.organize_datasets">organize_datasets</a></code></li>
-<li><code><a title="knc.data_processing.read_lightcurves" href="#knc.data_processing.read_lightcurves">read_lightcurves</a></code></li>
-<li><code><a title="knc.data_processing.run_processing" href="#knc.data_processing.run_processing">run_processing</a></code></li>
-<li><code><a title="knc.data_processing.save_datasets" href="#knc.data_processing.save_datasets">save_datasets</a></code></li>
+<ul class="two-column">
+<li><code><a title="knc.process.check_args" href="#knc.process.check_args">check_args</a></code></li>
+<li><code><a title="knc.process.organize_datasets" href="#knc.process.organize_datasets">organize_datasets</a></code></li>
+<li><code><a title="knc.process.parse_args" href="#knc.process.parse_args">parse_args</a></code></li>
+<li><code><a title="knc.process.read_lightcurves" href="#knc.process.read_lightcurves">read_lightcurves</a></code></li>
+<li><code><a title="knc.process.run_processing" href="#knc.process.run_processing">run_processing</a></code></li>
+<li><code><a title="knc.process.save_datasets" href="#knc.process.save_datasets">save_datasets</a></code></li>
 </ul>
 </li>
 </ul>
