@@ -7,6 +7,12 @@ import os
 import numpy as np
 import pandas as pd
 
+try:
+    import train
+except ModuleNotFoundError:
+    import sys
+    sys.path.append('knc')
+    import train
 
 class ArgumentError(Exception):
     """
@@ -42,20 +48,6 @@ def calibrate(scores: np.ndarray) -> np.ndarray :
     popt = [2.66766158e-05, 2.66362041e-05, 3.94224999e+01]
     return sigmoid(scores, *popt)
 
-def clean_data(df : pd.DataFrame) -> pd.DataFrame :
-    """
-    Remove inf and NaNs from data
-
-    Args:
-        df (pd.DataFrame): featurized data
-
-    Returns:
-        df without rows containing infs and NaNs
-    """
-    nas = [np.inf, -np.inf, 'inf', 'nan', 'NaN']
-    df = df.replace(nas, np.nan).dropna(axis=0, how='any')
-    return df.reset_index(drop=True)
-    
 
 def predict(classifier_dict : dict, data : pd.DataFrame) -> pd.DataFrame :
     """
@@ -81,7 +73,8 @@ def get_classifier_filename(dataset_id : str,
                             id_map_file : str = 'id_map.npy',
                             rfc_dir : str = 'classifiers/') -> str:
     """
-    Given a classifier ID, return the filepath to the classifier
+    Given a classifier ID, return the filepath to the classifier. Trains
+    a new classifier if no classifiers match the ID.
 
     Args:
         dataset_id (str): ID string for the dataset
@@ -95,10 +88,16 @@ def get_classifier_filename(dataset_id : str,
         rfc_dir += '/'
 
     id_map = load_classifier(f"{rfc_dir}{id_map_file}")
-    key = id_map[dataset_id]
+    try:
+        key = id_map[dataset_id]
+    except KeyError:
+        # Train a new classifier and update the id map
+        key = str(max([int(x) for x in id_map.values()]) + 1)
+        train.train_new(dataset_id, key, id_map_file, rfc_dir)
+        id_map[dataset_id] = key
+        np.save(f"{rfc_dir}{id_map_file}", id_map, allow_pickle=True)
 
     return f"{rfc_dir}knclassifier_{key}.npy"
-    
 
 def classify_datasets(data_dict : dict,
                       id_map_file : str = 'id_map.npy',
@@ -117,19 +116,15 @@ def classify_datasets(data_dict : dict,
     classified_data = []
     for dataset_id, df in data_dict.items():
         # Load classifier corresponding to dataset
-        try:
-            classifier_name = get_classifier_filename(
-                dataset_id, id_map_file, rfc_dir)
+        classifier_name = get_classifier_filename(
+            dataset_id, id_map_file, rfc_dir)
             
-        except KeyError:
-            print("WARNING: KNC-Live is not trained for some of the data")
-            continue
-
         # Load classifier
         classifier_dict = load_classifier(classifier_name)
         
         # Remove rows with infs and NaNs
-        clean_df = clean_data(df)
+        data = train.Data(df)
+        clean_df = data.clean_data()
 
         # Apply the classifier
         res = predict(classifier_dict, clean_df)
