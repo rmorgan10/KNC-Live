@@ -1,6 +1,7 @@
 """
 Functionalities to process a lightcurve file for KN-Classify
 """
+import argparse
 import os
 
 import numpy as np
@@ -107,15 +108,17 @@ def run_processing(lcs_file : str, results_dir : str = None):
     save_datasets(f'{results_dir}/KNC_datasets.npy', datasets)
 
 
-if __name__ == "__main__":
-    class ArgumentError(Exception):
-        """
-        A class to raise errors for invalid arguments
-        """
-        pass
+def parse_args() -> argparse.ArgumentParser :
+    """
+    Parse command line arguments to enable script-like data processing
     
-    
+    Returns:
+        argparser object
+    """
+
     import argparse
+    
+    from knc.knc import ArgumentError
 
     parser = argparse.ArgumentParser(description=__doc__)
 
@@ -128,6 +131,24 @@ if __name__ == "__main__":
                         type=str,
                         help='Directory to save results',
                         default=None)
+
+    return parser
+
+def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
+    """
+    Check the arguments for invalid values
+
+    Args:
+        parser (argparse.ArgumentParser): a parser object
+    
+    Returns:
+        The parsed arguments if all arguments are valid
+
+    Raises:
+        knc.ArgumentError if lcs_file is not found
+        knc.ArgumentError if results_dir cannot be found or created
+    """
+
     args = parser.parse_args()
 
     # Check that the lcs file exists
@@ -141,8 +162,18 @@ if __name__ == "__main__":
             try:
                 os.mkdir(results_dir)
             except FileNotFoundError:
-                raise ArgumentError(f"{args.results_dir} is not valid")
+                raise ArgumentError(f"{args.results_dir} is not valid")    
 
+    return args
+            
+    
+if __name__ == "__main__":
+
+    from knc.knc import process_main
+    
+    # Get and validate command line arguments
+    args = check_args(parse_args())
 
     # Run data processing
-    run_processing(args.lcs_file, args.results_dir)
+    process_main(args)
+
