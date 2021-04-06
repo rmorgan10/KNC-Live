@@ -36,6 +36,14 @@ import os
 import numpy as np
 import pandas as pd
 
+try:
+    import train
+    from utils import sigmoid
+except ModuleNotFoundError:
+    import sys
+    sys.path.append(&#39;knc&#39;)
+    import train
+    from utils import sigmoid
 
 class ArgumentError(Exception):
     &#34;&#34;&#34;
@@ -55,36 +63,20 @@ def load_classifier(filename : str) -&gt; dict :
     &#34;&#34;&#34;
     return np.load(filename, allow_pickle=True).item()
 
-def calibrate(scores: np.ndarray) -&gt; np.ndarray :
+def calibrate(scores: np.ndarray, popt : list) -&gt; np.ndarray :
     &#34;&#34;&#34;
     Transform output scores into probabilities
 
     Args:
         scores (np.array): scores assigned by classifer
- 
+        popt (list): calibration coefficients for sigmoid function
+
     Returns:
         calibrated scores
     &#34;&#34;&#34;
-    def sigmoid(x, a, b, c):
-        return a / (b + np.exp(-1.0 * c * x))
-    
-    popt = [2.66766158e-05, 2.66362041e-05, 3.94224999e+01]
+    #popt = [2.66766158e-05, 2.66362041e-05, 3.94224999e+01]
     return sigmoid(scores, *popt)
 
-def clean_data(df : pd.DataFrame) -&gt; pd.DataFrame :
-    &#34;&#34;&#34;
-    Remove inf and NaNs from data
-
-    Args:
-        df (pd.DataFrame): featurized data
-
-    Returns:
-        df without rows containing infs and NaNs
-    &#34;&#34;&#34;
-    nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
-    df = df.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
-    return df.reset_index(drop=True)
-    
 
 def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
     &#34;&#34;&#34;
@@ -97,11 +89,14 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
     Returns:
         DataFrame with a &#39;PROB_KN&#39; column
     &#34;&#34;&#34;
-    rfc = classifier_dict[&#39;classifier&#39;]
+    rfc = classifier_dict[&#39;rfc&#39;]
     feats = classifier_dict[&#39;feats&#39;]
+    popt = classifier_dict[&#39;calibration_coeffs&#39;]
 
     scores = rfc.predict_proba(data[feats])[:,1]
-    data[&#39;PROB_KN&#39;] = calibrate(scores)
+    data[&#39;PROB_KN&#39;] = calibrate(scores, popt)
+    data[&#39;KN&#39;] = [1 if x &gt;= classifier_dict[&#39;prob_cutoff&#39;]
+                  else 0 for x in data[&#39;PROB_KN&#39;].values]
 
     return data
 
@@ -110,7 +105,8 @@ def get_classifier_filename(dataset_id : str,
                             id_map_file : str = &#39;id_map.npy&#39;,
                             rfc_dir : str = &#39;classifiers/&#39;) -&gt; str:
     &#34;&#34;&#34;
-    Given a classifier ID, return the filepath to the classifier
+    Given a classifier ID, return the filepath to the classifier. Trains
+    a new classifier if no classifiers match the ID.
 
     Args:
         dataset_id (str): ID string for the dataset
@@ -124,10 +120,16 @@ def get_classifier_filename(dataset_id : str,
         rfc_dir += &#39;/&#39;
 
     id_map = load_classifier(f&#34;{rfc_dir}{id_map_file}&#34;)
-    key = id_map[dataset_id]
+    try:
+        key = id_map[dataset_id]
+    except KeyError:
+        # Train a new classifier and update the id map
+        key = str(max([int(x) for x in id_map.values()]) + 1)
+        train.train_new(dataset_id, key, rfc_dir)
+        id_map[dataset_id] = key
+        np.save(f&#34;{rfc_dir}{id_map_file}&#34;, id_map, allow_pickle=True)
 
     return f&#34;{rfc_dir}knclassifier_{key}.npy&#34;
-    
 
 def classify_datasets(data_dict : dict,
                       id_map_file : str = &#39;id_map.npy&#39;,
@@ -146,26 +148,23 @@ def classify_datasets(data_dict : dict,
     classified_data = []
     for dataset_id, df in data_dict.items():
         # Load classifier corresponding to dataset
-        try:
-            classifier_name = get_classifier_filename(
-                dataset_id, id_map_file, rfc_dir)
+        classifier_name = get_classifier_filename(
+            dataset_id, id_map_file, rfc_dir)
             
-        except KeyError:
-            print(&#34;WARNING: KNC-Live is not trained for some of the data&#34;)
-            continue
-
         # Load classifier
         classifier_dict = load_classifier(classifier_name)
         
         # Remove rows with infs and NaNs
-        clean_df = clean_data(df)
+        data = train.Data(df)
+        clean_df = data.clean_data()
 
         # Apply the classifier
         res = predict(classifier_dict, clean_df)
-        classified_data += [(x, y) for x, y in zip(res[&#39;SNID&#39;].values,
-                                                   res[&#39;PROB_KN&#39;].values)]
+        out_data += [(x, y, z) for x, y, z in zip(res[&#39;SNID&#39;].values,
+                                                  res[&#39;PROB_KN&#39;].values,
+                                                  res[&#39;KN&#39;].values)]
 
-    return pd.DataFrame(data=classified_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;])
+    return pd.DataFrame(data=out_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;])
 
 
 def parse_args() -&gt; argparse.ArgumentParser:
@@ -278,7 +277,7 @@ if __name__ == &#34;__main__&#34;:
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="knc.classify.calibrate"><code class="name flex">
-<span>def <span class="ident">calibrate</span></span>(<span>scores: numpy.ndarray) ‑> numpy.ndarray</span>
+<span>def <span class="ident">calibrate</span></span>(<span>scores: numpy.ndarray, popt: list) ‑> numpy.ndarray</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Transform output scores into probabilities</p>
@@ -286,6 +285,8 @@ if __name__ == &#34;__main__&#34;:
 <dl>
 <dt><strong><code>scores</code></strong> :&ensp;<code>np.array</code></dt>
 <dd>scores assigned by classifer</dd>
+<dt><strong><code>popt</code></strong> :&ensp;<code>list</code></dt>
+<dd>calibration coefficients for sigmoid function</dd>
 </dl>
 <h2 id="returns">Returns</h2>
 <p>calibrated scores</p></div>
@@ -293,20 +294,18 @@ if __name__ == &#34;__main__&#34;:
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def calibrate(scores: np.ndarray) -&gt; np.ndarray :
+<pre><code class="python">def calibrate(scores: np.ndarray, popt : list) -&gt; np.ndarray :
     &#34;&#34;&#34;
     Transform output scores into probabilities
 
     Args:
         scores (np.array): scores assigned by classifer
- 
+        popt (list): calibration coefficients for sigmoid function
+
     Returns:
         calibrated scores
     &#34;&#34;&#34;
-    def sigmoid(x, a, b, c):
-        return a / (b + np.exp(-1.0 * c * x))
-    
-    popt = [2.66766158e-05, 2.66362041e-05, 3.94224999e+01]
+    #popt = [2.66766158e-05, 2.66362041e-05, 3.94224999e+01]
     return sigmoid(scores, *popt)</code></pre>
 </details>
 </dd>
@@ -409,26 +408,23 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
     classified_data = []
     for dataset_id, df in data_dict.items():
         # Load classifier corresponding to dataset
-        try:
-            classifier_name = get_classifier_filename(
-                dataset_id, id_map_file, rfc_dir)
+        classifier_name = get_classifier_filename(
+            dataset_id, id_map_file, rfc_dir)
             
-        except KeyError:
-            print(&#34;WARNING: KNC-Live is not trained for some of the data&#34;)
-            continue
-
         # Load classifier
         classifier_dict = load_classifier(classifier_name)
         
         # Remove rows with infs and NaNs
-        clean_df = clean_data(df)
+        data = train.Data(df)
+        clean_df = data.clean_data()
 
         # Apply the classifier
         res = predict(classifier_dict, clean_df)
-        classified_data += [(x, y) for x, y in zip(res[&#39;SNID&#39;].values,
-                                                   res[&#39;PROB_KN&#39;].values)]
+        out_data += [(x, y, z) for x, y, z in zip(res[&#39;SNID&#39;].values,
+                                                  res[&#39;PROB_KN&#39;].values,
+                                                  res[&#39;KN&#39;].values)]
 
-    return pd.DataFrame(data=classified_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;])</code></pre>
+    return pd.DataFrame(data=out_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;])</code></pre>
 </details>
 </dd>
 <dt id="knc.classify.classify_main"><code class="name flex">
@@ -462,42 +458,12 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
     results.to_csv(f&#34;{args.results_dir}{args.results_outfile}&#34;, index=False)</code></pre>
 </details>
 </dd>
-<dt id="knc.classify.clean_data"><code class="name flex">
-<span>def <span class="ident">clean_data</span></span>(<span>df: pandas.core.frame.DataFrame) ‑> pandas.core.frame.DataFrame</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Remove inf and NaNs from data</p>
-<h2 id="args">Args</h2>
-<dl>
-<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
-<dd>featurized data</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<p>df without rows containing infs and NaNs</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def clean_data(df : pd.DataFrame) -&gt; pd.DataFrame :
-    &#34;&#34;&#34;
-    Remove inf and NaNs from data
-
-    Args:
-        df (pd.DataFrame): featurized data
-
-    Returns:
-        df without rows containing infs and NaNs
-    &#34;&#34;&#34;
-    nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
-    df = df.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
-    return df.reset_index(drop=True)</code></pre>
-</details>
-</dd>
 <dt id="knc.classify.get_classifier_filename"><code class="name flex">
 <span>def <span class="ident">get_classifier_filename</span></span>(<span>dataset_id: str, id_map_file: str = 'id_map.npy', rfc_dir: str = 'classifiers/') ‑> str</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Given a classifier ID, return the filepath to the classifier</p>
+<div class="desc"><p>Given a classifier ID, return the filepath to the classifier. Trains
+a new classifier if no classifiers match the ID.</p>
 <h2 id="args">Args</h2>
 <dl>
 <dt><strong><code>dataset_id</code></strong> :&ensp;<code>str</code></dt>
@@ -515,7 +481,8 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
                             id_map_file : str = &#39;id_map.npy&#39;,
                             rfc_dir : str = &#39;classifiers/&#39;) -&gt; str:
     &#34;&#34;&#34;
-    Given a classifier ID, return the filepath to the classifier
+    Given a classifier ID, return the filepath to the classifier. Trains
+    a new classifier if no classifiers match the ID.
 
     Args:
         dataset_id (str): ID string for the dataset
@@ -529,7 +496,14 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
         rfc_dir += &#39;/&#39;
 
     id_map = load_classifier(f&#34;{rfc_dir}{id_map_file}&#34;)
-    key = id_map[dataset_id]
+    try:
+        key = id_map[dataset_id]
+    except KeyError:
+        # Train a new classifier and update the id map
+        key = str(max([int(x) for x in id_map.values()]) + 1)
+        train.train_new(dataset_id, key, rfc_dir)
+        id_map[dataset_id] = key
+        np.save(f&#34;{rfc_dir}{id_map_file}&#34;, id_map, allow_pickle=True)
 
     return f&#34;{rfc_dir}knclassifier_{key}.npy&#34;</code></pre>
 </details>
@@ -637,11 +611,14 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
     Returns:
         DataFrame with a &#39;PROB_KN&#39; column
     &#34;&#34;&#34;
-    rfc = classifier_dict[&#39;classifier&#39;]
+    rfc = classifier_dict[&#39;rfc&#39;]
     feats = classifier_dict[&#39;feats&#39;]
+    popt = classifier_dict[&#39;calibration_coeffs&#39;]
 
     scores = rfc.predict_proba(data[feats])[:,1]
-    data[&#39;PROB_KN&#39;] = calibrate(scores)
+    data[&#39;PROB_KN&#39;] = calibrate(scores, popt)
+    data[&#39;KN&#39;] = [1 if x &gt;= classifier_dict[&#39;prob_cutoff&#39;]
+                  else 0 for x in data[&#39;PROB_KN&#39;].values]
 
     return data</code></pre>
 </details>
@@ -693,7 +670,6 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
 <li><code><a title="knc.classify.check_args" href="#knc.classify.check_args">check_args</a></code></li>
 <li><code><a title="knc.classify.classify_datasets" href="#knc.classify.classify_datasets">classify_datasets</a></code></li>
 <li><code><a title="knc.classify.classify_main" href="#knc.classify.classify_main">classify_main</a></code></li>
-<li><code><a title="knc.classify.clean_data" href="#knc.classify.clean_data">clean_data</a></code></li>
 <li><code><a title="knc.classify.get_classifier_filename" href="#knc.classify.get_classifier_filename">get_classifier_filename</a></code></li>
 <li><code><a title="knc.classify.load_classifier" href="#knc.classify.load_classifier">load_classifier</a></code></li>
 <li><code><a title="knc.classify.parse_args" href="#knc.classify.parse_args">parse_args</a></code></li>

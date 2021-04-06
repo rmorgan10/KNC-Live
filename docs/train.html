@@ -1,0 +1,1105 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, minimum-scale=1" />
+<meta name="generator" content="pdoc 0.9.2" />
+<title>knc.train API documentation</title>
+<meta name="description" content="Train a Random Forest Classifier" />
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/sanitize.min.css" integrity="sha256-PK9q560IAAa6WVRRh76LtCaI8pjTJ2z11v0miyNNjrs=" crossorigin>
+<link rel="preload stylesheet" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/10up-sanitize.css/11.0.1/typography.min.css" integrity="sha256-7l/o7C8jubJiy74VsKTidCy1yBkRtiUGbVkYBylBqUg=" crossorigin>
+<link rel="stylesheet preload" as="style" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/styles/github.min.css" crossorigin>
+<style>:root{--highlight-color:#fe9}.flex{display:flex !important}body{line-height:1.5em}#content{padding:20px}#sidebar{padding:30px;overflow:hidden}#sidebar > *:last-child{margin-bottom:2cm}.http-server-breadcrumbs{font-size:130%;margin:0 0 15px 0}#footer{font-size:.75em;padding:5px 30px;border-top:1px solid #ddd;text-align:right}#footer p{margin:0 0 0 1em;display:inline-block}#footer p:last-child{margin-right:30px}h1,h2,h3,h4,h5{font-weight:300}h1{font-size:2.5em;line-height:1.1em}h2{font-size:1.75em;margin:1em 0 .50em 0}h3{font-size:1.4em;margin:25px 0 10px 0}h4{margin:0;font-size:105%}h1:target,h2:target,h3:target,h4:target,h5:target,h6:target{background:var(--highlight-color);padding:.2em 0}a{color:#058;text-decoration:none;transition:color .3s ease-in-out}a:hover{color:#e82}.title code{font-weight:bold}h2[id^="header-"]{margin-top:2em}.ident{color:#900}pre code{background:#f8f8f8;font-size:.8em;line-height:1.4em}code{background:#f2f2f1;padding:1px 4px;overflow-wrap:break-word}h1 code{background:transparent}pre{background:#f8f8f8;border:0;border-top:1px solid #ccc;border-bottom:1px solid #ccc;margin:1em 0;padding:1ex}#http-server-module-list{display:flex;flex-flow:column}#http-server-module-list div{display:flex}#http-server-module-list dt{min-width:10%}#http-server-module-list p{margin-top:0}.toc ul,#index{list-style-type:none;margin:0;padding:0}#index code{background:transparent}#index h3{border-bottom:1px solid #ddd}#index ul{padding:0}#index h4{margin-top:.6em;font-weight:bold}@media (min-width:200ex){#index .two-column{column-count:2}}@media (min-width:300ex){#index .two-column{column-count:3}}dl{margin-bottom:2em}dl dl:last-child{margin-bottom:4em}dd{margin:0 0 1em 3em}#header-classes + dl > dd{margin-bottom:3em}dd dd{margin-left:2em}dd p{margin:10px 0}.name{background:#eee;font-weight:bold;font-size:.85em;padding:5px 10px;display:inline-block;min-width:40%}.name:hover{background:#e0e0e0}dt:target .name{background:var(--highlight-color)}.name > span:first-child{white-space:nowrap}.name.class > span:nth-child(2){margin-left:.4em}.inherited{color:#999;border-left:5px solid #eee;padding-left:1em}.inheritance em{font-style:normal;font-weight:bold}.desc h2{font-weight:400;font-size:1.25em}.desc h3{font-size:1em}.desc dt code{background:inherit}.source summary,.git-link-div{color:#666;text-align:right;font-weight:400;font-size:.8em;text-transform:uppercase}.source summary > *{white-space:nowrap;cursor:pointer}.git-link{color:inherit;margin-left:1em}.source pre{max-height:500px;overflow:auto;margin:0}.source pre code{font-size:12px;overflow:visible}.hlist{list-style:none}.hlist li{display:inline}.hlist li:after{content:',\2002'}.hlist li:last-child:after{content:none}.hlist .hlist{display:inline;padding-left:1em}img{max-width:100%}td{padding:0 .5em}.admonition{padding:.1em .5em;margin-bottom:1em}.admonition-title{font-weight:bold}.admonition.note,.admonition.info,.admonition.important{background:#aef}.admonition.todo,.admonition.versionadded,.admonition.tip,.admonition.hint{background:#dfd}.admonition.warning,.admonition.versionchanged,.admonition.deprecated{background:#fd4}.admonition.error,.admonition.danger,.admonition.caution{background:lightpink}</style>
+<style media="screen and (min-width: 700px)">@media screen and (min-width:700px){#sidebar{width:30%;height:100vh;overflow:auto;position:sticky;top:0}#content{width:70%;max-width:100ch;padding:3em 4em;border-left:1px solid #ddd}pre code{font-size:1em}.item .name{font-size:1em}main{display:flex;flex-direction:row-reverse;justify-content:flex-end}.toc ul ul,#index ul{padding-left:1.5em}.toc > ul > li{margin-top:.5em}}</style>
+<style media="print">@media print{#sidebar h1{page-break-before:always}.source{display:none}}@media print{*{background:transparent !important;color:#000 !important;box-shadow:none !important;text-shadow:none !important}a[href]:after{content:" (" attr(href) ")";font-size:90%}a[href][title]:after{content:none}abbr[title]:after{content:" (" attr(title) ")"}.ir a:after,a[href^="javascript:"]:after,a[href^="#"]:after{content:""}pre,blockquote{border:1px solid #999;page-break-inside:avoid}thead{display:table-header-group}tr,img{page-break-inside:avoid}img{max-width:100% !important}@page{margin:0.5cm}p,h2,h3{orphans:3;widows:3}h1,h2,h3,h4,h5,h6{page-break-after:avoid}}</style>
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/10.1.1/highlight.min.js" integrity="sha256-Uv3H6lx7dJmRfRvH8TH6kJD1TSK1aFcwgx+mdg3epi8=" crossorigin></script>
+<script>window.addEventListener('DOMContentLoaded', () => hljs.initHighlighting())</script>
+</head>
+<body>
+<main>
+<article id="content">
+<header>
+<h1 class="title">Module <code>knc.train</code></h1>
+</header>
+<section id="section-intro">
+<p>Train a Random Forest Classifier</p>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">&#34;&#34;&#34;
+Train a Random Forest Classifier
+&#34;&#34;&#34;
+
+import numpy as np
+import pandas as pd
+pd.set_option(&#39;use_inf_as_na&#39;, True)
+from scipy.optimize import curve_fit
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import roc_curve
+from sklearn.metrics import roc_auc_score
+from sklearn.metrics import precision_recall_curve as pr_curve
+from sklearn.model_selection import GridSearchCV
+from sklearn.model_selection import train_test_split
+
+try:
+    from utils import sigmoid
+except ModuleNotFoundError:
+    import sys
+    sys.path.append(&#39;knc&#39;)
+    from utils import sigmoid
+
+class Data:
+    &#34;&#34;&#34;
+    Organize all data for a ML algorithm
+    &#34;&#34;&#34;
+    def __init__(self, df : pd.DataFrame,
+                 doit : bool = False,
+                 feats: list = []):
+        &#34;&#34;&#34;
+        Instantiate a Data object from an input DataFrame. If doit is set to
+        True, then the X_train, X_test, y_train, y_test, and feats 
+        attributes are calculated
+        
+        Args:
+            df (pd.DataFrame): DataFrame for all objects / features
+            doit (bool, optional, default=False): run all data prep steps
+            feats (list, optional, default=[]): list of features to consider
+        &#34;&#34;&#34;
+        self.data = df
+
+        if doit:
+            self.data = self.select_feats(feats)
+            self.data = self.clean_data()
+            self.prep()
+    
+
+    def select_feats(self, feats : list = []) -&gt; pd.DataFrame :
+        &#34;&#34;&#34;
+        Select a subset of features for training. Store feats as attribute.
+
+        Args:
+            feats (list, optional, default=[]): features to use
+
+        Returns:
+            A DataFrame containing only the columns in feats
+
+        Raises:
+            ValueError if feats contains names not in columns of self.data
+        &#34;&#34;&#34;
+        # Set features to use
+        if len(feats) == 0 and not hasattr(self, &#39;feats&#39;):
+            return self.data
+        elif len(feats) != 0:
+            # Overwrite self.feats if feats are passed to this function
+            self.feats = feats
+            
+        # Check validity of features
+        intersection = set(feats).set(self.data.columns)
+        if len(intersection) != len(feats):
+            raise ValueError(&#34;One or more features are not in the data&#34;)
+
+        return self.data[feats].copy()
+
+    def clean_data(self) -&gt; pd.DataFrame :
+        &#34;&#34;&#34;
+        Remove inf and NaNs from data
+            
+        Returns:
+            df without rows containing infs and NaNs
+        &#34;&#34;&#34;
+        # Deal with NaNs and infs
+        nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
+        df = self.data.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
+
+        # Force numeric features
+        metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
+        num_cols = [x for x in df.columns if x not in metadata_cols]
+        df[num_cols] = df[num_cols].apply(pd.to_numeric)
+
+        #Drop any extra large values
+        df[num_cols] = df[num_cols][~(df[num_cols] &gt; 1.e6).any(axis=1)]
+
+        return df.copy().reset_index(drop=True)
+
+        
+    def prep(self):
+        &#34;&#34;&#34;
+        Encode and build training and testing sets
+        &#34;&#34;&#34;
+        # Apply one-hot encoding
+        kn_truth = [1 if x == &#39;KN&#39; else 0 for x in self.data[&#39;OBJ&#39;].values]
+        self.data[&#39;KN&#39;] = kn_truth
+
+        # Make training and validation sets
+        all_feats = [x for x in self.feats if x not in [&#39;SNID&#39;, &#39;CID&#39;, &#39;OBJ&#39;]]
+        X = self.data[all_feats]
+        y = self.data[&#39;KN&#39;]
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=6, stratify=y)
+
+        # Store attributes
+        self.X = X
+        self.y = y
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_test = X_test
+        self.y_test = y_test
+
+class Classifier:
+    &#34;&#34;&#34;
+    ML algorithm for classification
+    &#34;&#34;&#34;
+    def __init__(self, data : Data, doit : bool = False):
+        &#34;&#34;&#34;
+        Instantiate a Classifier object. If doit, the best_estimator,
+        feature dict, best_params, and feature_importances attirbutes are
+        calculated
+
+        Args:
+            data (Data) : A prepared instance of the Data class
+            doit (bool) : Train a classifier 
+        &#34;&#34;&#34;
+        self.data = data
+        self.X = data.X
+        self.y = data.y
+        self.X_train = data.X_train
+        self.y_train = data.y_train
+        self.X_test = data.X_test
+        self.y_test = data.y_test
+        
+        self.rfc = RandomForestClassifier(
+            n_estimators=100, max_depth=20, random_state=6, criterion=&#39;gini&#39;)
+
+        if doit:
+            self.optimize_hyperparamters()
+            self.optimize_features()
+            self.validate()
+            self.fit([], best=True)
+
+    def optimize_hyperparams(self):
+        &#34;&#34;&#34;
+        Determine best hyperparamters
+        &#34;&#34;&#34;
+        param_grid = {&#39;criterion&#39;: [&#39;gini&#39;, &#39;entropy&#39;],
+                      &#39;n_estimators&#39;: [10, 50, 100, 500],
+                      &#39;max_depth&#39;: [3, 5, 10, 20],
+                      &#39;class_weight&#39;: [&#39;balanced_subsample&#39;,
+                                       &#39;balanced&#39;, {0: 1, 1: 1}, {0: 5, 1:5}]}
+
+        gs = GridSearchCV(rfc, param_grid, cv=5)
+        gs.fit(self.data.X_train, self.data.y_train)
+        self.rfc = gs.best_estimator_
+        
+        
+    def optimize_features(self):
+        &#34;&#34;&#34;
+        Determine best features to use
+        &#34;&#34;&#34;
+        feature_dict = {}
+        feature_names = np.array(self.data.feats)
+        fi = self.rfc.feature_importances_
+        sorted_fi = sorted(fi)
+
+        # Method 1: use only featrues above maximum gradient
+        cut = sorted_fi[np.argmax(np.gradient(sorted_fi))]
+        feats = feature_names[np.where(self.rfc.feature_importances_ &gt; cut)]
+        if len(feats) &gt; 0:
+            rfc_ = self.fit(feats)
+            feature_dict[1] = {&#39;FEATURES&#39;: feats,
+                               &#39;SCORE&#39;: rfc.score(self.X_test[feats],
+                                                  self.y_test),
+                               &#39;CUTOFF&#39;: cut}
+        else:
+            feature_dict[1] = {&#39;FEATURES&#39;: feats,
+                               &#39;SCORE&#39;: 0.0,
+                               &#39;CUTOFF&#39;: cut}
+
+        # Method 2: use only features above a slightly lower cutoff
+        cut = (sorted_fi[np.argmax(np.gradient(sorted_fi))] /
+               (0.25 * len(feature_names)))
+        feats = feature_names[np.where(rfc.feature_importances_ &gt; cut)]
+        if len(feats) &gt; 0:
+            rfc = self.fit(feats)
+            feature_dict[2] = {&#39;FEATURES&#39;: feats,
+                               &#39;SCORE&#39;: rfc.score(self.X_test[feats],
+                                                  self.y_test),
+                               &#39;CUTOFF&#39;: cut}
+        else:
+            feature_dict[2] = {&#39;FEATURES&#39;: feats,
+                               &#39;SCORE&#39;: 0.0,
+                               &#39;CUTOFF&#39;: cut}
+
+        # Method 3: use all features
+        rfc = self.fit(feature_names)
+        feature_dict[3] = {&#39;FEATURES&#39;: feature_names,
+                           &#39;SCORE&#39;: rfc.score(self.X_test, self.y_test),
+                           &#39;CUTOFF&#39;: 0.0}
+
+        # Store results
+        self.feature_dict = feature_dict
+
+        # Establish best features
+        best_score = 0.0
+        for info in feature_dict.values():
+            if info[&#39;SCORE&#39;] &gt; best_score:
+                self.feats = info[&#39;FEATURES&#39;]
+                best_score = info[&#39;SCORE&#39;]
+        
+            
+    def validate(self):
+        &#34;&#34;&#34;
+        Evaluate performance on test data and determine calibration
+        &#34;&#34;&#34;
+        # Predict on test data
+        rfc = self.fit(self.feats)
+        scores = rfc.predict_proba(self.X_test)
+
+        # Calculate basic metrics
+        precision, recall, pr_thresholds = pr_curve(self.y_test[&#39;KN&#39;].values,
+                                                    scores)
+        f1_score = 2 * (precision * recall) / (precision + recall)
+        pr_threshold = pr_thresholds[np.argmax(f1_score)]
+        fpr, tpr, roc_thresholds = roc_curve(self.y_test[&#39;KN&#39;].values, scores)
+        auc = roc_auc_score(self.y_test[&#39;KN&#39;].values, scores)
+        
+        # Determine calibration
+        kn_probs, centers = [], []
+        for i in range(len(roc_thresholds) - 1):
+            
+            mask = ((scores &gt;= roc_thresholds[i+1]) &amp;
+                    (scores &lt; roc_thresholds[i]))
+            if sum(mask) == 0:
+                continue
+        
+            centers.append(0.5 * (roc_thresholds[i] + roc_thresholds[i+1]))
+            num_kn = sum(self.y_test[&#39;KN&#39;].values[mask] == 1)
+
+            total = sum(mask)
+            kn_probs.append(num_kn / total)
+            
+        popt, pcov = curve_fit(sigmoid, centers, kn_probs)
+        self.calibration_coeffs = popt
+        self.prob_cutoff = sigmoid(pr_threshold, *popt)
+
+        # Store metrics
+        roc_idx = np.argmin(np.abs(roc_thresholds - threshold))
+        pr_idx = np.argmin(np.abs(pr_thresholds - threshold))
+        self.metrics = {&#39;auc&#39;: auc,
+                        &#39;fpr&#39;: fpr[roc_idx],
+                        &#39;tpr&#39;: tpr[roc_idx],
+                        &#39;precision&#39;: precision[pr_idx],
+                        &#39;recall&#39;: recall[pr_idx],
+                        &#39;f1&#39;: max(f1_score)}
+                                         
+
+        
+    def fit(self, feats : list, best : bool = False):
+        &#34;&#34;&#34;
+        Fit an optimized RFC with the training data
+
+        Args:
+            feats (list): features to use in the fit (ignored if best==True)
+            best (bool): Use all data, if false only X_train is used
+
+        Returns:
+            a fit RFC if best == False
+        &#34;&#34;&#34;
+        if best:
+            self.rfc = self.rfc.fit(self.X[self.feats], self.y)
+        else:
+            return self.rfc.fit(self.X_train[feats], self.y_train)
+
+
+    def to_dict(self):
+        &#34;&#34;&#34;
+        Convert Classifier object to dictionary
+
+        Returns:
+            Dictionary where essential attributes of self are the keys
+        &#34;&#34;&#34;
+        out_dict = {&#39;rfc&#39;: self.rfc,
+                    &#39;metrics&#39;: self.metrics,
+                    &#39;feats&#39;: self.feats,
+                    &#39;calibration_coeffs&#39;: self.calibration_coeffs,
+                    &#39;prob_cutoff&#39;: self.prob_cutoff,
+                    &#39;feature_dict&#39;: self.feature_dict}
+
+def train_new(dataset_id : str,
+              key : str,
+              rfc_dir : str = &#39;classifiers/&#39;):
+    &#34;&#34;&#34;
+    Train a new classifier and return its key.
+
+    Args:
+        dataset_id (str): ID string for the dataset
+        key (str): ID for the newly trained classifier
+        rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+    &#34;&#34;&#34;
+    # Load training data
+    df = pd.read_csv(f&#39;{rfc_dir}training_data.csv&#39;)
+
+    # Determine features based on dataset ID
+    feats = [x for i, x in enumerate(df.columns) if dataset_id[i] == &#39;F&#39;] 
+
+    # Make a Data object
+    training_data = Data(df, feats=feats, doit=True)
+
+    # Make a classifier object
+    classifier = Classifier(data=training_data, doit=True)
+        
+    # Save classifier
+    np.save(f&#34;{rfc_dir}knclassifier_{key}.npy&#34;,
+            classifier.to_dict(),
+            allow_pickle=True)
+    
+
+    
+    </code></pre>
+</details>
+</section>
+<section>
+</section>
+<section>
+</section>
+<section>
+<h2 class="section-title" id="header-functions">Functions</h2>
+<dl>
+<dt id="knc.train.train_new"><code class="name flex">
+<span>def <span class="ident">train_new</span></span>(<span>dataset_id: str, key: str, rfc_dir: str = 'classifiers/')</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Train a new classifier and return its key.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>dataset_id</code></strong> :&ensp;<code>str</code></dt>
+<dd>ID string for the dataset</dd>
+<dt><strong><code>key</code></strong> :&ensp;<code>str</code></dt>
+<dd>ID for the newly trained classifier</dd>
+</dl>
+<p>rfc_dir (str, default='classifiers/'): path to classifier directory</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def train_new(dataset_id : str,
+              key : str,
+              rfc_dir : str = &#39;classifiers/&#39;):
+    &#34;&#34;&#34;
+    Train a new classifier and return its key.
+
+    Args:
+        dataset_id (str): ID string for the dataset
+        key (str): ID for the newly trained classifier
+        rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+    &#34;&#34;&#34;
+    # Load training data
+    df = pd.read_csv(f&#39;{rfc_dir}training_data.csv&#39;)
+
+    # Determine features based on dataset ID
+    feats = [x for i, x in enumerate(df.columns) if dataset_id[i] == &#39;F&#39;] 
+
+    # Make a Data object
+    training_data = Data(df, feats=feats, doit=True)
+
+    # Make a classifier object
+    classifier = Classifier(data=training_data, doit=True)
+        
+    # Save classifier
+    np.save(f&#34;{rfc_dir}knclassifier_{key}.npy&#34;,
+            classifier.to_dict(),
+            allow_pickle=True)</code></pre>
+</details>
+</dd>
+</dl>
+</section>
+<section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="knc.train.Classifier"><code class="flex name class">
+<span>class <span class="ident">Classifier</span></span>
+<span>(</span><span>data: <a title="knc.train.Data" href="#knc.train.Data">Data</a>, doit: bool = False)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>ML algorithm for classification</p>
+<p>Instantiate a Classifier object. If doit, the best_estimator,
+feature dict, best_params, and feature_importances attirbutes are
+calculated</p>
+<h2 id="args">Args</h2>
+<p>data (Data) : A prepared instance of the Data class
+doit (bool) : Train a classifier</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Classifier:
+    &#34;&#34;&#34;
+    ML algorithm for classification
+    &#34;&#34;&#34;
+    def __init__(self, data : Data, doit : bool = False):
+        &#34;&#34;&#34;
+        Instantiate a Classifier object. If doit, the best_estimator,
+        feature dict, best_params, and feature_importances attirbutes are
+        calculated
+
+        Args:
+            data (Data) : A prepared instance of the Data class
+            doit (bool) : Train a classifier 
+        &#34;&#34;&#34;
+        self.data = data
+        self.X = data.X
+        self.y = data.y
+        self.X_train = data.X_train
+        self.y_train = data.y_train
+        self.X_test = data.X_test
+        self.y_test = data.y_test
+        
+        self.rfc = RandomForestClassifier(
+            n_estimators=100, max_depth=20, random_state=6, criterion=&#39;gini&#39;)
+
+        if doit:
+            self.optimize_hyperparamters()
+            self.optimize_features()
+            self.validate()
+            self.fit([], best=True)
+
+    def optimize_hyperparams(self):
+        &#34;&#34;&#34;
+        Determine best hyperparamters
+        &#34;&#34;&#34;
+        param_grid = {&#39;criterion&#39;: [&#39;gini&#39;, &#39;entropy&#39;],
+                      &#39;n_estimators&#39;: [10, 50, 100, 500],
+                      &#39;max_depth&#39;: [3, 5, 10, 20],
+                      &#39;class_weight&#39;: [&#39;balanced_subsample&#39;,
+                                       &#39;balanced&#39;, {0: 1, 1: 1}, {0: 5, 1:5}]}
+
+        gs = GridSearchCV(rfc, param_grid, cv=5)
+        gs.fit(self.data.X_train, self.data.y_train)
+        self.rfc = gs.best_estimator_
+        
+        
+    def optimize_features(self):
+        &#34;&#34;&#34;
+        Determine best features to use
+        &#34;&#34;&#34;
+        feature_dict = {}
+        feature_names = np.array(self.data.feats)
+        fi = self.rfc.feature_importances_
+        sorted_fi = sorted(fi)
+
+        # Method 1: use only featrues above maximum gradient
+        cut = sorted_fi[np.argmax(np.gradient(sorted_fi))]
+        feats = feature_names[np.where(self.rfc.feature_importances_ &gt; cut)]
+        if len(feats) &gt; 0:
+            rfc_ = self.fit(feats)
+            feature_dict[1] = {&#39;FEATURES&#39;: feats,
+                               &#39;SCORE&#39;: rfc.score(self.X_test[feats],
+                                                  self.y_test),
+                               &#39;CUTOFF&#39;: cut}
+        else:
+            feature_dict[1] = {&#39;FEATURES&#39;: feats,
+                               &#39;SCORE&#39;: 0.0,
+                               &#39;CUTOFF&#39;: cut}
+
+        # Method 2: use only features above a slightly lower cutoff
+        cut = (sorted_fi[np.argmax(np.gradient(sorted_fi))] /
+               (0.25 * len(feature_names)))
+        feats = feature_names[np.where(rfc.feature_importances_ &gt; cut)]
+        if len(feats) &gt; 0:
+            rfc = self.fit(feats)
+            feature_dict[2] = {&#39;FEATURES&#39;: feats,
+                               &#39;SCORE&#39;: rfc.score(self.X_test[feats],
+                                                  self.y_test),
+                               &#39;CUTOFF&#39;: cut}
+        else:
+            feature_dict[2] = {&#39;FEATURES&#39;: feats,
+                               &#39;SCORE&#39;: 0.0,
+                               &#39;CUTOFF&#39;: cut}
+
+        # Method 3: use all features
+        rfc = self.fit(feature_names)
+        feature_dict[3] = {&#39;FEATURES&#39;: feature_names,
+                           &#39;SCORE&#39;: rfc.score(self.X_test, self.y_test),
+                           &#39;CUTOFF&#39;: 0.0}
+
+        # Store results
+        self.feature_dict = feature_dict
+
+        # Establish best features
+        best_score = 0.0
+        for info in feature_dict.values():
+            if info[&#39;SCORE&#39;] &gt; best_score:
+                self.feats = info[&#39;FEATURES&#39;]
+                best_score = info[&#39;SCORE&#39;]
+        
+            
+    def validate(self):
+        &#34;&#34;&#34;
+        Evaluate performance on test data and determine calibration
+        &#34;&#34;&#34;
+        # Predict on test data
+        rfc = self.fit(self.feats)
+        scores = rfc.predict_proba(self.X_test)
+
+        # Calculate basic metrics
+        precision, recall, pr_thresholds = pr_curve(self.y_test[&#39;KN&#39;].values,
+                                                    scores)
+        f1_score = 2 * (precision * recall) / (precision + recall)
+        pr_threshold = pr_thresholds[np.argmax(f1_score)]
+        fpr, tpr, roc_thresholds = roc_curve(self.y_test[&#39;KN&#39;].values, scores)
+        auc = roc_auc_score(self.y_test[&#39;KN&#39;].values, scores)
+        
+        # Determine calibration
+        kn_probs, centers = [], []
+        for i in range(len(roc_thresholds) - 1):
+            
+            mask = ((scores &gt;= roc_thresholds[i+1]) &amp;
+                    (scores &lt; roc_thresholds[i]))
+            if sum(mask) == 0:
+                continue
+        
+            centers.append(0.5 * (roc_thresholds[i] + roc_thresholds[i+1]))
+            num_kn = sum(self.y_test[&#39;KN&#39;].values[mask] == 1)
+
+            total = sum(mask)
+            kn_probs.append(num_kn / total)
+            
+        popt, pcov = curve_fit(sigmoid, centers, kn_probs)
+        self.calibration_coeffs = popt
+        self.prob_cutoff = sigmoid(pr_threshold, *popt)
+
+        # Store metrics
+        roc_idx = np.argmin(np.abs(roc_thresholds - threshold))
+        pr_idx = np.argmin(np.abs(pr_thresholds - threshold))
+        self.metrics = {&#39;auc&#39;: auc,
+                        &#39;fpr&#39;: fpr[roc_idx],
+                        &#39;tpr&#39;: tpr[roc_idx],
+                        &#39;precision&#39;: precision[pr_idx],
+                        &#39;recall&#39;: recall[pr_idx],
+                        &#39;f1&#39;: max(f1_score)}
+                                         
+
+        
+    def fit(self, feats : list, best : bool = False):
+        &#34;&#34;&#34;
+        Fit an optimized RFC with the training data
+
+        Args:
+            feats (list): features to use in the fit (ignored if best==True)
+            best (bool): Use all data, if false only X_train is used
+
+        Returns:
+            a fit RFC if best == False
+        &#34;&#34;&#34;
+        if best:
+            self.rfc = self.rfc.fit(self.X[self.feats], self.y)
+        else:
+            return self.rfc.fit(self.X_train[feats], self.y_train)
+
+
+    def to_dict(self):
+        &#34;&#34;&#34;
+        Convert Classifier object to dictionary
+
+        Returns:
+            Dictionary where essential attributes of self are the keys
+        &#34;&#34;&#34;
+        out_dict = {&#39;rfc&#39;: self.rfc,
+                    &#39;metrics&#39;: self.metrics,
+                    &#39;feats&#39;: self.feats,
+                    &#39;calibration_coeffs&#39;: self.calibration_coeffs,
+                    &#39;prob_cutoff&#39;: self.prob_cutoff,
+                    &#39;feature_dict&#39;: self.feature_dict}</code></pre>
+</details>
+<h3>Methods</h3>
+<dl>
+<dt id="knc.train.Classifier.fit"><code class="name flex">
+<span>def <span class="ident">fit</span></span>(<span>self, feats: list, best: bool = False)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Fit an optimized RFC with the training data</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>feats</code></strong> :&ensp;<code>list</code></dt>
+<dd>features to use in the fit (ignored if best==True)</dd>
+<dt><strong><code>best</code></strong> :&ensp;<code>bool</code></dt>
+<dd>Use all data, if false only X_train is used</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>a fit RFC if best == False</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def fit(self, feats : list, best : bool = False):
+    &#34;&#34;&#34;
+    Fit an optimized RFC with the training data
+
+    Args:
+        feats (list): features to use in the fit (ignored if best==True)
+        best (bool): Use all data, if false only X_train is used
+
+    Returns:
+        a fit RFC if best == False
+    &#34;&#34;&#34;
+    if best:
+        self.rfc = self.rfc.fit(self.X[self.feats], self.y)
+    else:
+        return self.rfc.fit(self.X_train[feats], self.y_train)</code></pre>
+</details>
+</dd>
+<dt id="knc.train.Classifier.optimize_features"><code class="name flex">
+<span>def <span class="ident">optimize_features</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Determine best features to use</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def optimize_features(self):
+    &#34;&#34;&#34;
+    Determine best features to use
+    &#34;&#34;&#34;
+    feature_dict = {}
+    feature_names = np.array(self.data.feats)
+    fi = self.rfc.feature_importances_
+    sorted_fi = sorted(fi)
+
+    # Method 1: use only featrues above maximum gradient
+    cut = sorted_fi[np.argmax(np.gradient(sorted_fi))]
+    feats = feature_names[np.where(self.rfc.feature_importances_ &gt; cut)]
+    if len(feats) &gt; 0:
+        rfc_ = self.fit(feats)
+        feature_dict[1] = {&#39;FEATURES&#39;: feats,
+                           &#39;SCORE&#39;: rfc.score(self.X_test[feats],
+                                              self.y_test),
+                           &#39;CUTOFF&#39;: cut}
+    else:
+        feature_dict[1] = {&#39;FEATURES&#39;: feats,
+                           &#39;SCORE&#39;: 0.0,
+                           &#39;CUTOFF&#39;: cut}
+
+    # Method 2: use only features above a slightly lower cutoff
+    cut = (sorted_fi[np.argmax(np.gradient(sorted_fi))] /
+           (0.25 * len(feature_names)))
+    feats = feature_names[np.where(rfc.feature_importances_ &gt; cut)]
+    if len(feats) &gt; 0:
+        rfc = self.fit(feats)
+        feature_dict[2] = {&#39;FEATURES&#39;: feats,
+                           &#39;SCORE&#39;: rfc.score(self.X_test[feats],
+                                              self.y_test),
+                           &#39;CUTOFF&#39;: cut}
+    else:
+        feature_dict[2] = {&#39;FEATURES&#39;: feats,
+                           &#39;SCORE&#39;: 0.0,
+                           &#39;CUTOFF&#39;: cut}
+
+    # Method 3: use all features
+    rfc = self.fit(feature_names)
+    feature_dict[3] = {&#39;FEATURES&#39;: feature_names,
+                       &#39;SCORE&#39;: rfc.score(self.X_test, self.y_test),
+                       &#39;CUTOFF&#39;: 0.0}
+
+    # Store results
+    self.feature_dict = feature_dict
+
+    # Establish best features
+    best_score = 0.0
+    for info in feature_dict.values():
+        if info[&#39;SCORE&#39;] &gt; best_score:
+            self.feats = info[&#39;FEATURES&#39;]
+            best_score = info[&#39;SCORE&#39;]</code></pre>
+</details>
+</dd>
+<dt id="knc.train.Classifier.optimize_hyperparams"><code class="name flex">
+<span>def <span class="ident">optimize_hyperparams</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Determine best hyperparamters</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def optimize_hyperparams(self):
+    &#34;&#34;&#34;
+    Determine best hyperparamters
+    &#34;&#34;&#34;
+    param_grid = {&#39;criterion&#39;: [&#39;gini&#39;, &#39;entropy&#39;],
+                  &#39;n_estimators&#39;: [10, 50, 100, 500],
+                  &#39;max_depth&#39;: [3, 5, 10, 20],
+                  &#39;class_weight&#39;: [&#39;balanced_subsample&#39;,
+                                   &#39;balanced&#39;, {0: 1, 1: 1}, {0: 5, 1:5}]}
+
+    gs = GridSearchCV(rfc, param_grid, cv=5)
+    gs.fit(self.data.X_train, self.data.y_train)
+    self.rfc = gs.best_estimator_</code></pre>
+</details>
+</dd>
+<dt id="knc.train.Classifier.to_dict"><code class="name flex">
+<span>def <span class="ident">to_dict</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Convert Classifier object to dictionary</p>
+<h2 id="returns">Returns</h2>
+<p>Dictionary where essential attributes of self are the keys</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def to_dict(self):
+    &#34;&#34;&#34;
+    Convert Classifier object to dictionary
+
+    Returns:
+        Dictionary where essential attributes of self are the keys
+    &#34;&#34;&#34;
+    out_dict = {&#39;rfc&#39;: self.rfc,
+                &#39;metrics&#39;: self.metrics,
+                &#39;feats&#39;: self.feats,
+                &#39;calibration_coeffs&#39;: self.calibration_coeffs,
+                &#39;prob_cutoff&#39;: self.prob_cutoff,
+                &#39;feature_dict&#39;: self.feature_dict}</code></pre>
+</details>
+</dd>
+<dt id="knc.train.Classifier.validate"><code class="name flex">
+<span>def <span class="ident">validate</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Evaluate performance on test data and determine calibration</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def validate(self):
+    &#34;&#34;&#34;
+    Evaluate performance on test data and determine calibration
+    &#34;&#34;&#34;
+    # Predict on test data
+    rfc = self.fit(self.feats)
+    scores = rfc.predict_proba(self.X_test)
+
+    # Calculate basic metrics
+    precision, recall, pr_thresholds = pr_curve(self.y_test[&#39;KN&#39;].values,
+                                                scores)
+    f1_score = 2 * (precision * recall) / (precision + recall)
+    pr_threshold = pr_thresholds[np.argmax(f1_score)]
+    fpr, tpr, roc_thresholds = roc_curve(self.y_test[&#39;KN&#39;].values, scores)
+    auc = roc_auc_score(self.y_test[&#39;KN&#39;].values, scores)
+    
+    # Determine calibration
+    kn_probs, centers = [], []
+    for i in range(len(roc_thresholds) - 1):
+        
+        mask = ((scores &gt;= roc_thresholds[i+1]) &amp;
+                (scores &lt; roc_thresholds[i]))
+        if sum(mask) == 0:
+            continue
+    
+        centers.append(0.5 * (roc_thresholds[i] + roc_thresholds[i+1]))
+        num_kn = sum(self.y_test[&#39;KN&#39;].values[mask] == 1)
+
+        total = sum(mask)
+        kn_probs.append(num_kn / total)
+        
+    popt, pcov = curve_fit(sigmoid, centers, kn_probs)
+    self.calibration_coeffs = popt
+    self.prob_cutoff = sigmoid(pr_threshold, *popt)
+
+    # Store metrics
+    roc_idx = np.argmin(np.abs(roc_thresholds - threshold))
+    pr_idx = np.argmin(np.abs(pr_thresholds - threshold))
+    self.metrics = {&#39;auc&#39;: auc,
+                    &#39;fpr&#39;: fpr[roc_idx],
+                    &#39;tpr&#39;: tpr[roc_idx],
+                    &#39;precision&#39;: precision[pr_idx],
+                    &#39;recall&#39;: recall[pr_idx],
+                    &#39;f1&#39;: max(f1_score)}</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+<dt id="knc.train.Data"><code class="flex name class">
+<span>class <span class="ident">Data</span></span>
+<span>(</span><span>df: pandas.core.frame.DataFrame, doit: bool = False, feats: list = [])</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Organize all data for a ML algorithm</p>
+<p>Instantiate a Data object from an input DataFrame. If doit is set to
+True, then the X_train, X_test, y_train, y_test, and feats
+attributes are calculated</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>df</code></strong> :&ensp;<code>pd.DataFrame</code></dt>
+<dd>DataFrame for all objects / features</dd>
+<dt><strong><code>doit</code></strong> :&ensp;<code>bool</code>, optional, default=<code>False</code></dt>
+<dd>run all data prep steps</dd>
+<dt><strong><code>feats</code></strong> :&ensp;<code>list</code>, optional, default=<code>[]</code></dt>
+<dd>list of features to consider</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class Data:
+    &#34;&#34;&#34;
+    Organize all data for a ML algorithm
+    &#34;&#34;&#34;
+    def __init__(self, df : pd.DataFrame,
+                 doit : bool = False,
+                 feats: list = []):
+        &#34;&#34;&#34;
+        Instantiate a Data object from an input DataFrame. If doit is set to
+        True, then the X_train, X_test, y_train, y_test, and feats 
+        attributes are calculated
+        
+        Args:
+            df (pd.DataFrame): DataFrame for all objects / features
+            doit (bool, optional, default=False): run all data prep steps
+            feats (list, optional, default=[]): list of features to consider
+        &#34;&#34;&#34;
+        self.data = df
+
+        if doit:
+            self.data = self.select_feats(feats)
+            self.data = self.clean_data()
+            self.prep()
+    
+
+    def select_feats(self, feats : list = []) -&gt; pd.DataFrame :
+        &#34;&#34;&#34;
+        Select a subset of features for training. Store feats as attribute.
+
+        Args:
+            feats (list, optional, default=[]): features to use
+
+        Returns:
+            A DataFrame containing only the columns in feats
+
+        Raises:
+            ValueError if feats contains names not in columns of self.data
+        &#34;&#34;&#34;
+        # Set features to use
+        if len(feats) == 0 and not hasattr(self, &#39;feats&#39;):
+            return self.data
+        elif len(feats) != 0:
+            # Overwrite self.feats if feats are passed to this function
+            self.feats = feats
+            
+        # Check validity of features
+        intersection = set(feats).set(self.data.columns)
+        if len(intersection) != len(feats):
+            raise ValueError(&#34;One or more features are not in the data&#34;)
+
+        return self.data[feats].copy()
+
+    def clean_data(self) -&gt; pd.DataFrame :
+        &#34;&#34;&#34;
+        Remove inf and NaNs from data
+            
+        Returns:
+            df without rows containing infs and NaNs
+        &#34;&#34;&#34;
+        # Deal with NaNs and infs
+        nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
+        df = self.data.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
+
+        # Force numeric features
+        metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
+        num_cols = [x for x in df.columns if x not in metadata_cols]
+        df[num_cols] = df[num_cols].apply(pd.to_numeric)
+
+        #Drop any extra large values
+        df[num_cols] = df[num_cols][~(df[num_cols] &gt; 1.e6).any(axis=1)]
+
+        return df.copy().reset_index(drop=True)
+
+        
+    def prep(self):
+        &#34;&#34;&#34;
+        Encode and build training and testing sets
+        &#34;&#34;&#34;
+        # Apply one-hot encoding
+        kn_truth = [1 if x == &#39;KN&#39; else 0 for x in self.data[&#39;OBJ&#39;].values]
+        self.data[&#39;KN&#39;] = kn_truth
+
+        # Make training and validation sets
+        all_feats = [x for x in self.feats if x not in [&#39;SNID&#39;, &#39;CID&#39;, &#39;OBJ&#39;]]
+        X = self.data[all_feats]
+        y = self.data[&#39;KN&#39;]
+        X_train, X_test, y_train, y_test = train_test_split(
+            X, y, test_size=0.2, random_state=6, stratify=y)
+
+        # Store attributes
+        self.X = X
+        self.y = y
+        self.X_train = X_train
+        self.y_train = y_train
+        self.X_test = X_test
+        self.y_test = y_test</code></pre>
+</details>
+<h3>Methods</h3>
+<dl>
+<dt id="knc.train.Data.clean_data"><code class="name flex">
+<span>def <span class="ident">clean_data</span></span>(<span>self) ‑> pandas.core.frame.DataFrame</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Remove inf and NaNs from data</p>
+<h2 id="returns">Returns</h2>
+<p>df without rows containing infs and NaNs</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def clean_data(self) -&gt; pd.DataFrame :
+    &#34;&#34;&#34;
+    Remove inf and NaNs from data
+        
+    Returns:
+        df without rows containing infs and NaNs
+    &#34;&#34;&#34;
+    # Deal with NaNs and infs
+    nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
+    df = self.data.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
+
+    # Force numeric features
+    metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
+    num_cols = [x for x in df.columns if x not in metadata_cols]
+    df[num_cols] = df[num_cols].apply(pd.to_numeric)
+
+    #Drop any extra large values
+    df[num_cols] = df[num_cols][~(df[num_cols] &gt; 1.e6).any(axis=1)]
+
+    return df.copy().reset_index(drop=True)</code></pre>
+</details>
+</dd>
+<dt id="knc.train.Data.prep"><code class="name flex">
+<span>def <span class="ident">prep</span></span>(<span>self)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Encode and build training and testing sets</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def prep(self):
+    &#34;&#34;&#34;
+    Encode and build training and testing sets
+    &#34;&#34;&#34;
+    # Apply one-hot encoding
+    kn_truth = [1 if x == &#39;KN&#39; else 0 for x in self.data[&#39;OBJ&#39;].values]
+    self.data[&#39;KN&#39;] = kn_truth
+
+    # Make training and validation sets
+    all_feats = [x for x in self.feats if x not in [&#39;SNID&#39;, &#39;CID&#39;, &#39;OBJ&#39;]]
+    X = self.data[all_feats]
+    y = self.data[&#39;KN&#39;]
+    X_train, X_test, y_train, y_test = train_test_split(
+        X, y, test_size=0.2, random_state=6, stratify=y)
+
+    # Store attributes
+    self.X = X
+    self.y = y
+    self.X_train = X_train
+    self.y_train = y_train
+    self.X_test = X_test
+    self.y_test = y_test</code></pre>
+</details>
+</dd>
+<dt id="knc.train.Data.select_feats"><code class="name flex">
+<span>def <span class="ident">select_feats</span></span>(<span>self, feats: list = []) ‑> pandas.core.frame.DataFrame</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Select a subset of features for training. Store feats as attribute.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>feats</code></strong> :&ensp;<code>list</code>, optional, default=<code>[]</code></dt>
+<dd>features to use</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>A DataFrame containing only the columns in feats</p>
+<h2 id="raises">Raises</h2>
+<p>ValueError if feats contains names not in columns of self.data</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def select_feats(self, feats : list = []) -&gt; pd.DataFrame :
+    &#34;&#34;&#34;
+    Select a subset of features for training. Store feats as attribute.
+
+    Args:
+        feats (list, optional, default=[]): features to use
+
+    Returns:
+        A DataFrame containing only the columns in feats
+
+    Raises:
+        ValueError if feats contains names not in columns of self.data
+    &#34;&#34;&#34;
+    # Set features to use
+    if len(feats) == 0 and not hasattr(self, &#39;feats&#39;):
+        return self.data
+    elif len(feats) != 0:
+        # Overwrite self.feats if feats are passed to this function
+        self.feats = feats
+        
+    # Check validity of features
+    intersection = set(feats).set(self.data.columns)
+    if len(intersection) != len(feats):
+        raise ValueError(&#34;One or more features are not in the data&#34;)
+
+    return self.data[feats].copy()</code></pre>
+</details>
+</dd>
+</dl>
+</dd>
+</dl>
+</section>
+</article>
+<nav id="sidebar">
+<h1>Index</h1>
+<div class="toc">
+<ul></ul>
+</div>
+<ul id="index">
+<li><h3>Super-module</h3>
+<ul>
+<li><code><a title="knc" href="index.html">knc</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-functions">Functions</a></h3>
+<ul class="">
+<li><code><a title="knc.train.train_new" href="#knc.train.train_new">train_new</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="knc.train.Classifier" href="#knc.train.Classifier">Classifier</a></code></h4>
+<ul class="">
+<li><code><a title="knc.train.Classifier.fit" href="#knc.train.Classifier.fit">fit</a></code></li>
+<li><code><a title="knc.train.Classifier.optimize_features" href="#knc.train.Classifier.optimize_features">optimize_features</a></code></li>
+<li><code><a title="knc.train.Classifier.optimize_hyperparams" href="#knc.train.Classifier.optimize_hyperparams">optimize_hyperparams</a></code></li>
+<li><code><a title="knc.train.Classifier.to_dict" href="#knc.train.Classifier.to_dict">to_dict</a></code></li>
+<li><code><a title="knc.train.Classifier.validate" href="#knc.train.Classifier.validate">validate</a></code></li>
+</ul>
+</li>
+<li>
+<h4><code><a title="knc.train.Data" href="#knc.train.Data">Data</a></code></h4>
+<ul class="">
+<li><code><a title="knc.train.Data.clean_data" href="#knc.train.Data.clean_data">clean_data</a></code></li>
+<li><code><a title="knc.train.Data.prep" href="#knc.train.Data.prep">prep</a></code></li>
+<li><code><a title="knc.train.Data.select_feats" href="#knc.train.Data.select_feats">select_feats</a></code></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</nav>
+</main>
+<footer id="footer">
+<p>Generated by <a href="https://pdoc3.github.io/pdoc"><cite>pdoc</cite> 0.9.2</a>.</p>
+</footer>
+</body>
+</html>
