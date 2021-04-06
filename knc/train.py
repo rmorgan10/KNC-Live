@@ -227,22 +227,23 @@ class Classifier:
         scores = rfc.predict_proba(self.X_test)
 
         # Calculate basic metrics
-        precision, recall, thresholds = pr_curve(self.y_test['KN'].values,
-                                                 scores)
+        precision, recall, pr_thresholds = pr_curve(self.y_test['KN'].values,
+                                                    scores)
         f1_score = 2 * (precision * recall) / (precision + recall)
-        threshold = thresholds[np.argmax(f1_score)]
-        fpr, tpr, thresholds = roc_curve(self.y_test['KN'].values, scores)
+        pr_threshold = pr_thresholds[np.argmax(f1_score)]
+        fpr, tpr, roc_thresholds = roc_curve(self.y_test['KN'].values, scores)
         auc = roc_auc_score(self.y_test['KN'].values, scores)
         
         # Determine calibration
         kn_probs, centers = [], []
-        for i in range(len(thresholds) - 1):
+        for i in range(len(roc_thresholds) - 1):
             
-            mask = (scores >= thresholds[i+1]) & (scores < thresholds[i])
+            mask = ((scores >= roc_thresholds[i+1]) &
+                    (scores < roc_thresholds[i]))
             if sum(mask) == 0:
                 continue
         
-            centers.append(0.5 * (thresholds[i] + thresholds[i+1]))
+            centers.append(0.5 * (roc_thresholds[i] + roc_thresholds[i+1]))
             num_kn = sum(self.y_test['KN'].values[mask] == 1)
 
             total = sum(mask)
@@ -250,9 +251,18 @@ class Classifier:
             
         popt, pcov = curve_fit(sigmoid, centers, kn_probs)
         self.calibration_coeffs = popt
+        self.prob_cutoff = sigmoid(pr_threshold, *popt)
 
         # Store metrics
-        
+        roc_idx = np.argmin(np.abs(roc_thresholds - threshold))
+        pr_idx = np.argmin(np.abs(pr_thresholds - threshold))
+        self.metrics = {'auc': auc,
+                        'fpr': fpr[roc_idx],
+                        'tpr': tpr[roc_idx],
+                        'precision': precision[pr_idx],
+                        'recall': recall[pr_idx],
+                        'f1': max(f1_score)}
+                                         
 
         
     def fit(self, feats : list, best : bool = False):
@@ -270,11 +280,24 @@ class Classifier:
             self.rfc = self.rfc.fit(self.X[self.feats], self.y)
         else:
             return self.rfc.fit(self.X_train[feats], self.y_train)
-        
+
+
+    def to_dict(self):
+        """
+        Convert Classifier object to dictionary
+
+        Returns:
+            Dictionary where essential attributes of self are the keys
+        """
+        out_dict = {'rfc': self.rfc,
+                    'metrics': self.metrics,
+                    'feats': self.feats,
+                    'calibration_coeffs': self.calibration_coeffs,
+                    'prob_cutoff': self.prob_cutoff,
+                    'feature_dict': self.feature_dict}
 
 def train_new(dataset_id : str,
               key : str,
-              id_map_file : str = 'id_map.npy',
               rfc_dir : str = 'classifiers/'):
     """
     Train a new classifier and return its key.
@@ -282,14 +305,13 @@ def train_new(dataset_id : str,
     Args:
         dataset_id (str): ID string for the dataset
         key (str): ID for the newly trained classifier
-        id_map_file (str, default='id_map.npy'): path to map of classifier ids
         rfc_dir (str, default='classifiers/'): path to classifier directory
     """
     # Load training data
+    df = pd.read_csv(f'{rfc_dir}training_data.csv')
 
-    # Determine features
-
-    # Target training df
+    # Determine features based on dataset ID
+    feats = [x for i, x in enumerate(df.columns) if dataset_id[i] == 'F'] 
 
     # Make a Data object
     training_data = Data(df, feats=feats, doit=True)
@@ -298,6 +320,9 @@ def train_new(dataset_id : str,
     classifier = Classifier(data=training_data, doit=True)
         
     # Save classifier
+    np.save(f"{rfc_dir}knclassifier_{key}.npy",
+            classifier.to_dict(),
+            allow_pickle=True)
     
 
     

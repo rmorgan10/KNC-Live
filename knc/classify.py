@@ -9,10 +9,12 @@ import pandas as pd
 
 try:
     import train
+    from utils import sigmoid
 except ModuleNotFoundError:
     import sys
     sys.path.append('knc')
     import train
+    from utils import sigmoid
 
 class ArgumentError(Exception):
     """
@@ -32,20 +34,18 @@ def load_classifier(filename : str) -> dict :
     """
     return np.load(filename, allow_pickle=True).item()
 
-def calibrate(scores: np.ndarray) -> np.ndarray :
+def calibrate(scores: np.ndarray, popt : list) -> np.ndarray :
     """
     Transform output scores into probabilities
 
     Args:
         scores (np.array): scores assigned by classifer
- 
+        popt (list): calibration coefficients for sigmoid function
+
     Returns:
         calibrated scores
     """
-    def sigmoid(x, a, b, c):
-        return a / (b + np.exp(-1.0 * c * x))
-    
-    popt = [2.66766158e-05, 2.66362041e-05, 3.94224999e+01]
+    #popt = [2.66766158e-05, 2.66362041e-05, 3.94224999e+01]
     return sigmoid(scores, *popt)
 
 
@@ -60,11 +60,14 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -> pd.DataFrame :
     Returns:
         DataFrame with a 'PROB_KN' column
     """
-    rfc = classifier_dict['classifier']
+    rfc = classifier_dict['rfc']
     feats = classifier_dict['feats']
+    popt = classifier_dict['calibration_coeffs']
 
     scores = rfc.predict_proba(data[feats])[:,1]
-    data['PROB_KN'] = calibrate(scores)
+    data['PROB_KN'] = calibrate(scores, popt)
+    data['KN'] = [1 if x >= classifier_dict['prob_cutoff']
+                  else 0 for x in data['PROB_KN'].values]
 
     return data
 
@@ -93,7 +96,7 @@ def get_classifier_filename(dataset_id : str,
     except KeyError:
         # Train a new classifier and update the id map
         key = str(max([int(x) for x in id_map.values()]) + 1)
-        train.train_new(dataset_id, key, id_map_file, rfc_dir)
+        train.train_new(dataset_id, key, rfc_dir)
         id_map[dataset_id] = key
         np.save(f"{rfc_dir}{id_map_file}", id_map, allow_pickle=True)
 
@@ -128,10 +131,11 @@ def classify_datasets(data_dict : dict,
 
         # Apply the classifier
         res = predict(classifier_dict, clean_df)
-        classified_data += [(x, y) for x, y in zip(res['SNID'].values,
-                                                   res['PROB_KN'].values)]
+        out_data += [(x, y, z) for x, y, z in zip(res['SNID'].values,
+                                                  res['PROB_KN'].values,
+                                                  res['KN'].values)]
 
-    return pd.DataFrame(data=classified_data, columns=['SNID', 'PROB_KN'])
+    return pd.DataFrame(data=out_data, columns=['SNID', 'PROB_KN'])
 
 
 def parse_args() -> argparse.ArgumentParser:
