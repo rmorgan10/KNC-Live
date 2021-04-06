@@ -109,9 +109,14 @@ class FeatureExtractor():
     @staticmethod
     def __get_mjds(lc, flt):
         if flt is None:
-            return lc['MJD'].values.astype(float)
+            mjds = lc['MJD'].values.astype(float)
         else:
-            return lc['MJD'].values[lc['FLT'].values == flt].astype(float)
+            mjds =  lc['MJD'].values[lc['FLT'].values == flt].astype(float)
+
+        if len(mjds) != 0:
+            return mjds - mjds.min()
+        else:
+            return mjds
 
     def slope_average(self, lc, flt1, flt2=None):
         mags = self.__get_mags(lc, flt1)
@@ -260,8 +265,9 @@ class FeatureExtractor():
         flux, fluxerr = self.__get_flux_and_fluxerr(lc, flt1)
         if len(flux) == 0:
             return 'N'
-        else:
-            return lc['MJD'].values[np.argmax(flux / fluxerr)]
+
+        mjds = self.__get_mjds(lc, flt1)
+        return mjds[np.argmax(flux / fluxerr)]
 
 
     # Family 6: Flat line fitting
