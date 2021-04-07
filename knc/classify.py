@@ -9,30 +9,13 @@ import pandas as pd
 
 try:
     import train
-    from utils import sigmoid
+    from utils import sigmoid, ArgumentError, load, save
 except ModuleNotFoundError:
     import sys
     sys.path.append('knc')
     import train
-    from utils import sigmoid
+    from utils import sigmoid, ArgumentError, load, save
 
-class ArgumentError(Exception):
-    """
-    A class to raise errors for invalid arguments
-    """
-    pass
-
-def load_classifier(filename : str) -> dict :
-    """
-    Load a classifier from a pickled file
-
-    Args:
-        filename (str): name of classifer file
-
-    Returns:
-        dictionary of classifier and features to use
-    """
-    return np.load(filename, allow_pickle=True).item()
 
 def calibrate(scores: np.ndarray, popt : list) -> np.ndarray :
     """
@@ -90,7 +73,7 @@ def get_classifier_filename(dataset_id : str,
     if not rfc_dir.endswith('/'):
         rfc_dir += '/'
 
-    id_map = load_classifier(f"{rfc_dir}{id_map_file}")
+    id_map = load(f"{rfc_dir}{id_map_file}")
     try:
         key = id_map[dataset_id]
     except KeyError:
@@ -98,7 +81,7 @@ def get_classifier_filename(dataset_id : str,
         key = str(max([int(x) for x in id_map.values()]) + 1)
         train.train_new(dataset_id, key, rfc_dir)
         id_map[dataset_id] = key
-        np.save(f"{rfc_dir}{id_map_file}", id_map, allow_pickle=True)
+        save(f"{rfc_dir}{id_map_file}", id_map)
 
     return f"{rfc_dir}knclassifier_{key}.npy"
 
@@ -123,7 +106,7 @@ def classify_datasets(data_dict : dict,
             dataset_id, id_map_file, rfc_dir)
             
         # Load classifier
-        classifier_dict = load_classifier(classifier_name)
+        classifier_dict = load(classifier_name)
         
         # Remove rows with infs and NaNs
         data = train.Data(df)
@@ -222,7 +205,7 @@ def classify_main(args):
     """
     # Run classification
     results = classify.classify_datasets(
-        load_classifier(args.datasets_file),
+        load(args.datasets_file),
         args.id_map_file,
         args.rfc_dir)
 

@@ -8,17 +8,13 @@ import argparse
 try:
     import process 
     import classify
+    from utils import ArgumentError
 except ModuleNotFoundError:
     import sys
     sys.path.append('knc')
     import process
     import classify
-
-class ArgumentError(Exception):
-    """
-    A class to raise errors for invalid arguments
-    """
-    pass
+    from utils import ArgumentError
 
 
 def parse_args() -> argparse.ArgumentParser:

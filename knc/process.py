@@ -9,28 +9,47 @@ import pandas as pd
 
 try:
     import feature_extraction
+    from utils import ArgumentError, load, save
 except ModuleNotFoundError:
     import sys
     sys.path.append('knc')
     import feature_extraction
+    from utils import ArgumentError, load, save
 
-class ArgumentError(Exception):
-    """
-    A class to raise errors for invalid arguments
-    """
-    pass
 
-def read_lightcurves(filename : str) -> dict :
+def trim_lcs(lcs : dict, cut_requirement : int = 0) -> dict :
     """
-    Open a lightcurve file and return the pickeled dictionary
+    Remove epochs from a lightcurve that occur before object discovery, which
+    is defined as the first mjd with SNR >= 3.0.
 
     Args:
-        filename (str): Path to lightcurve file
+        lcs (dict): dictionary from a lightcurve file
+        cut_requirement (int, default=0): cut number to require
 
     Returns:
-        dictionary containing lightcurves from pickeled file
+        copy of lcs with pre-discovery epochs removed from each lightcurve
     """
-    return np.load(filename).item()
+    out_lcs = {}
+    for snid, info in lcs.items():
+        
+        # Skip if the lightcurve will get cut during feature extraction
+        if not (info['cut'] == -1 or info['cut'] > cut_requirement):
+            continue
+
+        # Get discovery MJD
+        mjds = info['lightcurve']['MJD'].values.astype(float)
+        flux = info['lightcurve']['FLUXCAL'].values.astype(float)
+        fluxerr = info['lightcurve']['FLUXCALERR'].values.astype(float)
+        detection_mask = ((flux / fluxerr) >= 3.0)
+        mjd0 = mjds[detection_mask].min()
+
+        # Trim lightcurve
+        lc = info['lightcurve'][mjds >= mjd0].copy().reset_index(drop=True)
+
+        # Store results
+        out_lcs[snid] = {'lightcurve': lc, 'cut': info['cut']}
+
+    return out_lcs
 
 
 def organize_datasets(df : pd.DataFrame) -> dict :
@@ -78,17 +97,6 @@ def organize_datasets(df : pd.DataFrame) -> dict :
 
     return datasets
     
-def save_datasets(outfile : str, datasets : dict):
-    """
-    Write datasets to a file
-
-    Args:
-        outfile (str): filename to store datasets
-        datasets (dict):  A dict mapping dataset identifiers to the datasets 
-    """
-    np.save(outfile, datasets, allow_pickle=True)
-
-
 def run_processing(lcs_file : str, results_dir : str = None):
     """
     Run all processing steps on a lightcurve file and save results to disk
@@ -106,7 +114,7 @@ def run_processing(lcs_file : str, results_dir : str = None):
         os.mkdir(results_dir)
 
     # Load data
-    lcs = read_lightcurves(lcs_file)
+    lcs = load(lcs_file)
 
     # Extract features
     feat_df = feature_extraction.extract_all(lcs)
@@ -115,7 +123,7 @@ def run_processing(lcs_file : str, results_dir : str = None):
     datasets = organize_datasets(feat_df)
 
     # Save results
-    save_datasets(f'{results_dir}/KNC_datasets.npy', datasets)
+    save(f'{results_dir}/KNC_datasets.npy', datasets)
 
 
 def parse_args() -> argparse.ArgumentParser :
