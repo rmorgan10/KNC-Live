@@ -296,19 +296,21 @@ class Classifier:
                     'prob_cutoff': self.prob_cutoff,
                     'feature_dict': self.feature_dict}
 
-def train_new(dataset_id : str,
+def train_new(mode : str,
+              dataset_id : str,
               key : str,
               rfc_dir : str = 'classifiers/'):
     """
     Train a new classifier and return its key.
 
     Args:
+        mode (str): type of classifier ('r', 'f', 'rfp', 'ffp')
         dataset_id (str): ID string for the dataset
         key (str): ID for the newly trained classifier
         rfc_dir (str, default='classifiers/'): path to classifier directory
     """
     # Load training data
-    df = pd.read_csv(f'{rfc_dir}training_data.csv')
+    df = pd.read_csv(f'{rfc_dir}training_data_{mode}.csv')
 
     # Determine features based on dataset ID
     with open(f"{rfc_dir}features.txt", 'r') as f:
@@ -322,7 +324,7 @@ def train_new(dataset_id : str,
     classifier = Classifier(data=training_data, doit=True)
         
     # Save classifier
-    save(f"{rfc_dir}knclassifier_{key}.npy", classifier.to_dict())
+    save(f"{rfc_dir}knclassifier_{mode}_{key}.npy", classifier.to_dict())
     
 
     

@@ -39,6 +39,10 @@ def parse_args() -> argparse.ArgumentParser:
     parser.add_argument('--datasets_file',
                         type=str,
                         help='Path to datasets file')
+    parser.add_argument('--mode',
+                        type=str,
+                        help=('Type of data to classify. r=realtime, f=full, r'
+                              'fp=realtime+force_photo, ffp=full+force_photo'))
     parser.add_argument('--results_outfile',
                         type=str,
                         help='Filename to store results',

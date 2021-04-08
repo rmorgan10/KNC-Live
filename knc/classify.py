@@ -55,7 +55,8 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -> pd.DataFrame :
     return data
 
 
-def get_classifier_filename(dataset_id : str,
+def get_classifier_filename(mode : str,
+                            dataset_id : str,
                             id_map_file : str = 'id_map.npy',
                             rfc_dir : str = 'classifiers/') -> str:
     """
@@ -63,6 +64,7 @@ def get_classifier_filename(dataset_id : str,
     a new classifier if no classifiers match the ID.
 
     Args:
+        mode (str): Type of classifier ('r', 'f', 'rfp', 'ffp')
         dataset_id (str): ID string for the dataset
         id_map_file (str, default='id_map.npy'): path to map of classifier ids
         rfc_dir (str, default='classifiers/'): path to classifier directory
@@ -73,25 +75,27 @@ def get_classifier_filename(dataset_id : str,
     if not rfc_dir.endswith('/'):
         rfc_dir += '/'
 
-    id_map = load(f"{rfc_dir}{id_map_file}")
+    id_map = load(f"{rfc_dir}{mode}_{id_map_file}")
     try:
         key = id_map[dataset_id]
     except KeyError:
         # Train a new classifier and update the id map
         key = str(max([int(x) for x in id_map.values()]) + 1)
-        train.train_new(dataset_id, key, rfc_dir)
+        train.train_new(mode, dataset_id, key, rfc_dir)
         id_map[dataset_id] = key
-        save(f"{rfc_dir}{id_map_file}", id_map)
+        save(f"{rfc_dir}{mode}_{id_map_file}", id_map)
 
-    return f"{rfc_dir}knclassifier_{key}.npy"
+    return f"{rfc_dir}knclassifier_{mode}_{key}.npy"
 
-def classify_datasets(data_dict : dict,
+def classify_datasets(mode : str,
+                      data_dict : dict,
                       id_map_file : str = 'id_map.npy',
                       rfc_dir : str = 'classifiers/') -> pd.DataFrame :
     """
     For each dataset, load the corresponding classifier and predict
 
     Args:
+        mode (str): Type of classifier ('r', 'f', 'rfp', 'ffp')  
         data_dict (dict): dictionary containing all datasets
         id_map_file (str, default='id_map.npy'): path to map of classifier ids
         rfc_dir (str, default='classifiers/'): path to classifier directory
@@ -103,7 +107,7 @@ def classify_datasets(data_dict : dict,
     for dataset_id, df in data_dict.items():
         # Load classifier corresponding to dataset
         classifier_name = get_classifier_filename(
-            dataset_id, id_map_file, rfc_dir)
+            mode, dataset_id, id_map_file, rfc_dir)
             
         # Load classifier
         classifier_dict = load(classifier_name)
@@ -118,7 +122,7 @@ def classify_datasets(data_dict : dict,
                                                   res['PROB_KN'].values,
                                                   res['KN'].values)]
 
-    return pd.DataFrame(data=out_data, columns=['SNID', 'PROB_KN'])
+    return pd.DataFrame(data=out_data, columns=['SNID', 'PROB_KN', 'KN'])
 
 
 def parse_args() -> argparse.ArgumentParser:
@@ -134,6 +138,11 @@ def parse_args() -> argparse.ArgumentParser:
     parser.add_argument('--datasets_file',
                         type=str,
                         help='Path to datasets file',
+                        required=True)
+    parser.add_argument('--mode',
+                        type=str,
+                        help=('Type of data to classify. r=realtime, f=full, r'
+                              'fp=realtime+force_photo, ffp=full+force_photo'),
                         required=True)
     parser.add_argument('--results_outfile',
                         type=str,
@@ -165,6 +174,7 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
         The parsed arguments if all arguments are valid
 
     Raises:
+        knc.ArgumentError if mode not in ('r', 'f', 'rfp', 'ffp')
         knc.ArgumentError if rfc_dir is not found
         knc.ArgumentError if id_map_file is not found
         knc.ArgumentError if datasets_file is not found
@@ -172,7 +182,11 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
     """
     args = parser.parse_args()
 
-    # Check the the classifiers directory exists
+    # Check that the mode is valid
+    if not mode in ['r', 'f', 'rfp', 'ffp']:
+        raise ArgumentError(f"{args.mode} must be r, f, rfp, or ffp")
+
+    # Check that the classifiers directory exists
     if not os.path.exists(args.rfc_dir):
         raise ArgumentError(f"{args.rfc_dir} not found")
     if not args.rfc_dir.endswith('/'):
@@ -205,6 +219,7 @@ def classify_main(args):
     """
     # Run classification
     results = classify.classify_datasets(
+        args.mode,
         load(args.datasets_file),
         args.id_map_file,
         args.rfc_dir)
