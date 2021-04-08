@@ -118,9 +118,23 @@ class FeatureExtractor():
         else:
             return mjds
 
+    @staticmethod
+    def __combine_nites(mags, mjds):
+        nites = mjds.round().astype(int)
+        data = {}
+        out_mjds, out_mags = [], []
+        for idx, nite in enumerate(nites):
+            if not nite in data:
+                data[nite] = None
+                out_mjds.append(mjds[idx])
+                out_mags.append(mags[idx])
+
+        return np.array(out_mjds), np.array(out_mags)
+        
     def slope_average(self, lc, flt1, flt2=None):
         mags = self.__get_mags(lc, flt1)
         mjds = self.__get_mjds(lc, flt1)
+        mjds, mags = self.__combine_nites(mags, mjds)
         if len(mags) > 1:
             if mjds[-1] != mjds[0]:
                 return (mags[-1] - mags[0]) / (mjds[-1] - mjds[0])
@@ -132,6 +146,7 @@ class FeatureExtractor():
     def slope_max(self, lc, flt1, flt2=None):
         mags = self.__get_mags(lc, flt1)
         mjds = self.__get_mjds(lc, flt1)
+        mjds, mags = self.__combine_nites(mags, mjds)
         if len(mags) > 1:
             return np.max(np.diff(mags) / np.diff(mjds))
         else:
@@ -140,6 +155,7 @@ class FeatureExtractor():
     def slope_min(self, lc, flt1, flt2=None):
         mags = self.__get_mags(lc, flt1)
         mjds = self.__get_mjds(lc, flt1)
+        mjds, mags = self.__combine_nites(mags, mjds)
         if len(mags) > 1:
             return np.min(np.diff(mags) / np.diff(mjds))
         else:
@@ -148,6 +164,7 @@ class FeatureExtractor():
     def slope_mjd_of_max(self, lc, flt1, flt2=None):
         mags = self.__get_mags(lc, flt1)
         mjds = self.__get_mjds(lc, flt1)
+        mjds, mags = self.__combine_nites(mags, mjds)
         if len(mags) > 1:
             return mjds[np.argmax(np.diff(mags) / np.diff(mjds))]
         else:
@@ -156,6 +173,7 @@ class FeatureExtractor():
     def slope_mjd_of_min(self, lc, flt1, flt2=None):
         mags = self.__get_mags(lc, flt1)
         mjds = self.__get_mjds(lc, flt1)
+        mjds, mags = self.__combine_nites(mags, mjds)
         if len(mags) > 1:
             return mjds[np.argmin(np.diff(mags) / np.diff(mjds))]
         else:

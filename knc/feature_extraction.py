@@ -4,8 +4,12 @@ Extract features from lightcurves
 
 import pandas as pd
 
-from features import FeatureExtractor
-
+try:
+    from features import FeatureExtractor
+except ModuleNotFoundError:
+    import sys
+    sys.path.append('knc')
+    from features import FeatureExtractor
 
 def extract(lc : pd.DataFrame,
             extractor : FeatureExtractor,
@@ -48,8 +52,10 @@ def extract(lc : pd.DataFrame,
     return data_dict
 
 def extract_all(lcs : dict,
-                cut_requirement: int = 0,
-                obj : str = 'DATA') -> pd.DataFrame:
+                cut_requirement : int = 0,
+                obj : str = 'DATA',
+                return_feats : bool = False,
+                sample : int = None) -> pd.DataFrame:
     """
     Extract features from all lightcurves in a dictionary
 
@@ -57,25 +63,38 @@ def extract_all(lcs : dict,
         lcs (dict): dict of all lightcurves
         cut_requirement (int, default=0): number of cut to enforce
         obj (str, default='DATA') : label to give to object
-    
+        return_feats (bool, default=False) : return list of all features 
+        sample (int, default=None): max number of lightcurves to use
+
     Returns:
-        pandas DataFrame of all extracted features
+        pandas DataFrame of all extracted features,
+        list of all features if return_feats=True
     """
     extractor = FeatureExtractor()
 
     # Extract features for everything at the desired cut level
     data = []
-    for snid, info in cut_res.items():
+    count = 0
+    sample = len(lcs) if sample is None else sample
+    for snid, info in lcs.items():
         if info['cut'] > cut_requirement or info['cut'] == -1:
             flts = set(info['lightcurve']['FLT'].values)
-            data_dict = extract(info['lightcurve'], flts, extractor)
+            data_dict = extract(info['lightcurve'], extractor, flts)
             data_dict['SNID'] = snid
             data_dict['OBJ'] = obj
             data.append(data_dict)
 
+            count += 1
+            if count >= sample:
+                break
+
     # Construct and clean a DataFrame
     df = pd.DataFrame(data)
+    feats = df.columns
     df = df.dropna(how='all')
     df = df.fillna('N')
 
+    if return_feats:
+        return df, feats
+    
     return df

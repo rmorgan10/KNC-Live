@@ -14,11 +14,11 @@ from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 
 try:
-    from utils import sigmoid
+    from utils import sigmoid, save
 except ModuleNotFoundError:
     import sys
     sys.path.append('knc')
-    from utils import sigmoid
+    from utils import sigmoid, save
 
 class Data:
     """
@@ -311,7 +311,9 @@ def train_new(dataset_id : str,
     df = pd.read_csv(f'{rfc_dir}training_data.csv')
 
     # Determine features based on dataset ID
-    feats = [x for i, x in enumerate(df.columns) if dataset_id[i] == 'F'] 
+    with open(f"{rfc_dir}features.txt", 'r') as f:
+        all_feats = [x for x in f.readlines.split('\n') if x != '']
+    feats = [x for i, x in enumerate(all_feats) if dataset_id[i] == 'F'] 
 
     # Make a Data object
     training_data = Data(df, feats=feats, doit=True)
@@ -320,9 +322,7 @@ def train_new(dataset_id : str,
     classifier = Classifier(data=training_data, doit=True)
         
     # Save classifier
-    np.save(f"{rfc_dir}knclassifier_{key}.npy",
-            classifier.to_dict(),
-            allow_pickle=True)
+    save(f"{rfc_dir}knclassifier_{key}.npy", classifier.to_dict())
     
 
     

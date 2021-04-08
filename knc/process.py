@@ -36,11 +36,14 @@ def trim_lcs(lcs : dict, cut_requirement : int = 0) -> dict :
         if not (info['cut'] == -1 or info['cut'] > cut_requirement):
             continue
 
-        # Get discovery MJD
-        mjds = info['lightcurve']['MJD'].values.astype(float)
+        # Get discovery MJD, skip if light curve is never discovered
         flux = info['lightcurve']['FLUXCAL'].values.astype(float)
         fluxerr = info['lightcurve']['FLUXCALERR'].values.astype(float)
         detection_mask = ((flux / fluxerr) >= 3.0)
+        if sum(detection_mask) == 0:
+            continue
+
+        mjds = info['lightcurve']['MJD'].values.astype(float)
         mjd0 = mjds[detection_mask].min()
 
         # Trim lightcurve
@@ -93,7 +96,7 @@ def organize_datasets(df : pd.DataFrame) -> dict :
     # Store datasets in a dictionary
     datasets = {k: pd.DataFrame(data=v, columns=df.columns).drop(
         labels=bad_cols[k], axis=1)
-                for k, v in groups.iteritems()}
+                for k, v in groups.items()}
 
     return datasets
     
