@@ -5,16 +5,20 @@ Run KN-Classify Live
 import os
 import argparse
 
-try:
-    import process 
-    import classify
-    from utils import ArgumentError
-except ModuleNotFoundError:
-    import sys
-    sys.path.append('knc')
-    import process
-    import classify
-    from utils import ArgumentError
+from knc import process
+from knc import classify
+from knc.utils import ArgumentError
+
+#try:
+#    import process 
+#    import classify
+#    from utils import ArgumentError
+#except ModuleNotFoundError:
+#    import sys
+#    sys.path.append('knc')
+#    import process
+#    import classify
+#    from utils import ArgumentError
 
 
 def parse_args() -> argparse.ArgumentParser:
