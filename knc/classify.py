@@ -183,7 +183,7 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
     args = parser.parse_args()
 
     # Check that the mode is valid
-    if not mode in ['r', 'f', 'rfp', 'ffp']:
+    if not args.mode in ['r', 'f', 'rfp', 'ffp']:
         raise ArgumentError(f"{args.mode} must be r, f, rfp, or ffp")
 
     # Check that the classifiers directory exists
@@ -194,7 +194,7 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
     
     # Check that the needed files exist
     for filename in [args.datasets_file, args.rfc_dir + args.id_map_file]:
-        if not os.path.exists(filename):
+        if filename is None or not os.path.exists(filename):
             raise ArgumentError(f"{filename} not found")
 
     # Check that the results directory can be made or exists
