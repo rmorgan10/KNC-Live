@@ -2,14 +2,13 @@
 Extract features from lightcurves
 """
 
+import sys
+sys.path.append('knc')
+
 import pandas as pd
 
-try:
-    from features import FeatureExtractor
-except ModuleNotFoundError:
-    import sys
-    sys.path.append('knc')
-    from features import FeatureExtractor
+from features import FeatureExtractor
+
 
 def extract(lc : pd.DataFrame,
             extractor : FeatureExtractor,
@@ -55,7 +54,8 @@ def extract_all(lcs : dict,
                 cut_requirement : int = 0,
                 obj : str = 'DATA',
                 return_feats : bool = False,
-                sample : int = None) -> pd.DataFrame:
+                sample : int = None,
+                verbose : bool = False) -> pd.DataFrame:
     """
     Extract features from all lightcurves in a dictionary
 
@@ -65,6 +65,7 @@ def extract_all(lcs : dict,
         obj (str, default='DATA') : label to give to object
         return_feats (bool, default=False) : return list of all features 
         sample (int, default=None): max number of lightcurves to use
+        verbose (bool, default=False): print progress
 
     Returns:
         pandas DataFrame of all extracted features,
@@ -76,6 +77,7 @@ def extract_all(lcs : dict,
     data = []
     count = 0
     sample = len(lcs) if sample is None else sample
+
     for snid, info in lcs.items():
         if info['cut'] > cut_requirement or info['cut'] == -1:
             flts = set(info['lightcurve']['FLT'].values)
@@ -88,11 +90,19 @@ def extract_all(lcs : dict,
             if count >= sample:
                 break
 
+        if verbose and count % 50 == 0:
+            progress = str(round(count / sample * 100.0, 2))
+            sys.stdout.write(f"Progress: {progress} %    \r")
+            sys.flush()
+            
     # Construct and clean a DataFrame
     df = pd.DataFrame(data)
     feats = df.columns
     df = df.dropna(how='all')
     df = df.fillna('N')
+
+    if verbose:
+        print("")
 
     if return_feats:
         return df, feats

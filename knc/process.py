@@ -3,18 +3,14 @@ Functionalities to process a lightcurve file for KN-Classify
 """
 import argparse
 import os
+import sys
+sys.path.append('knc')
 
 import numpy as np
 import pandas as pd
 
-try:
-    import feature_extraction
-    from utils import ArgumentError, load, save
-except ModuleNotFoundError:
-    import sys
-    sys.path.append('knc')
-    import feature_extraction
-    from utils import ArgumentError, load, save
+import feature_extraction
+from utils import ArgumentError, load, save
 
 
 def trim_lcs(lcs : dict, cut_requirement : int = 0) -> dict :
@@ -100,13 +96,16 @@ def organize_datasets(df : pd.DataFrame) -> dict :
 
     return datasets
     
-def run_processing(lcs_file : str, results_dir : str = None):
+def run_processing(lcs_file : str,
+                   results_dir : str = None,
+                   verbose : bool = False):
     """
     Run all processing steps on a lightcurve file and save results to disk
 
     Args:
         lcs_file (str): Path to lightcurve file
         results_dir (str, optional, default=None): directory to save results
+        verbose (bool, default=False): print status updates
     """
     # Establish the results directory
     if results_dir is None:
@@ -120,7 +119,7 @@ def run_processing(lcs_file : str, results_dir : str = None):
     lcs = load(lcs_file)
 
     # Extract features
-    feat_df = feature_extraction.extract_all(lcs)
+    feat_df = feature_extraction.extract_all(lcs, verbose=verbose)
 
     # Organize into datasets
     datasets = organize_datasets(feat_df)
@@ -148,6 +147,9 @@ def parse_args() -> argparse.ArgumentParser :
                         type=str,
                         help='Directory to save results',
                         default=None)
+    parser.add_argument('--verbose',
+                        action='store_true',
+                        help='Print status updates')
 
     return parser
 
@@ -195,7 +197,7 @@ def process_main(args):
     """
 
     # Run data processing
-    process.run_processing(args.lcs_file, args.results_dir)
+    process.run_processing(args.lcs_file, args.results_dir, args.verbose)
 
     
 if __name__ == "__main__":

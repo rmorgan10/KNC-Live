@@ -9,17 +9,6 @@ from knc import process
 from knc import classify
 from knc.utils import ArgumentError
 
-#try:
-#    import process 
-#    import classify
-#    from utils import ArgumentError
-#except ModuleNotFoundError:
-#    import sys
-#    sys.path.append('knc')
-#    import process
-#    import classify
-#    from utils import ArgumentError
-
 
 def parse_args() -> argparse.ArgumentParser:
     """
@@ -63,6 +52,9 @@ def parse_args() -> argparse.ArgumentParser:
                         type=str,
                         help='Name of ID map file in classifier directory',
                         default='id_map.npy')
+    parser.add_argument('--verbose',
+                        action='store_true',
+                        help='Print status updates')
 
     return parser
 
