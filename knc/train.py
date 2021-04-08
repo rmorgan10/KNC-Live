@@ -1,6 +1,8 @@
 """
 Train a Random Forest Classifier
 """
+import sys
+sys.path.append('knc')
 
 import numpy as np
 import pandas as pd
@@ -13,12 +15,7 @@ from sklearn.metrics import precision_recall_curve as pr_curve
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 
-try:
-    from utils import sigmoid, save
-except ModuleNotFoundError:
-    import sys
-    sys.path.append('knc')
-    from utils import sigmoid, save
+from utils import sigmoid, save
 
 class Data:
     """
@@ -121,7 +118,10 @@ class Classifier:
     """
     ML algorithm for classification
     """
-    def __init__(self, data : Data, doit : bool = False):
+    def __init__(self,
+                 data : Data,
+                 doit : bool = False,
+                 verbose : bool = False):
         """
         Instantiate a Classifier object. If doit, the best_estimator,
         feature dict, best_params, and feature_importances attirbutes are
@@ -129,7 +129,8 @@ class Classifier:
 
         Args:
             data (Data) : A prepared instance of the Data class
-            doit (bool) : Train a classifier 
+            doit (bool) : Train a classifier
+            verbose (bool, default=False): Print status updates
         """
         self.data = data
         self.X = data.X
@@ -143,8 +144,14 @@ class Classifier:
             n_estimators=100, max_depth=20, random_state=6, criterion='gini')
 
         if doit:
+            if verbose:
+                print("Optimizing hyperparameters with grid search")
             self.optimize_hyperparamters()
+            if verbose:
+                print("Selecting optimal features")
             self.optimize_features()
+            if verbose:
+                print("Validating classifier")
             self.validate()
             self.fit([], best=True)
 
@@ -299,7 +306,8 @@ class Classifier:
 def train_new(mode : str,
               dataset_id : str,
               key : str,
-              rfc_dir : str = 'classifiers/'):
+              rfc_dir : str = 'classifiers/',
+              verbose : bool = False):
     """
     Train a new classifier and return its key.
 
@@ -308,6 +316,7 @@ def train_new(mode : str,
         dataset_id (str): ID string for the dataset
         key (str): ID for the newly trained classifier
         rfc_dir (str, default='classifiers/'): path to classifier directory
+        verbose (bool, default=False): Print status updates
     """
     # Load training data
     df = pd.read_csv(f'{rfc_dir}training_data_{mode}.csv')
@@ -318,10 +327,14 @@ def train_new(mode : str,
     feats = [x for i, x in enumerate(all_feats) if dataset_id[i] == 'F'] 
 
     # Make a Data object
+    if verbose:
+        print("Preparing training data")
     training_data = Data(df, feats=feats, doit=True)
 
     # Make a classifier object
-    classifier = Classifier(data=training_data, doit=True)
+    if verbose:
+        print("Training classifier")
+    classifier = Classifier(data=training_data, doit=True, verbose=verbose)
         
     # Save classifier
     save(f"{rfc_dir}knclassifier_{mode}_{key}.npy", classifier.to_dict())

@@ -3,18 +3,14 @@ Classify datasets
 """
 import argparse
 import os
+import sys
+sys.path.append('knc')
 
 import numpy as np
 import pandas as pd
 
-try:
-    import train
-    from utils import sigmoid, ArgumentError, load, save
-except ModuleNotFoundError:
-    import sys
-    sys.path.append('knc')
-    import train
-    from utils import sigmoid, ArgumentError, load, save
+import train
+from utils import sigmoid, ArgumentError, load, save
 
 
 def calibrate(scores: np.ndarray, popt : list) -> np.ndarray :
@@ -58,7 +54,8 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -> pd.DataFrame :
 def get_classifier_filename(mode : str,
                             dataset_id : str,
                             id_map_file : str = 'id_map.npy',
-                            rfc_dir : str = 'classifiers/') -> str:
+                            rfc_dir : str = 'classifiers/',
+                            verbose : bool = False) -> str:
     """
     Given a classifier ID, return the filepath to the classifier. Trains
     a new classifier if no classifiers match the ID.
@@ -68,6 +65,7 @@ def get_classifier_filename(mode : str,
         dataset_id (str): ID string for the dataset
         id_map_file (str, default='id_map.npy'): path to map of classifier ids
         rfc_dir (str, default='classifiers/'): path to classifier directory
+        verbose (bool, default=False): Print status updates
 
     Returns:
         filename of the classifier
@@ -79,9 +77,12 @@ def get_classifier_filename(mode : str,
     try:
         key = id_map[dataset_id]
     except KeyError:
+        if verbose:
+            print("No classifier found, training new classifier")
+        
         # Train a new classifier and update the id map
         key = str(max([int(x) for x in id_map.values()]) + 1)
-        train.train_new(mode, dataset_id, key, rfc_dir)
+        train.train_new(mode, dataset_id, key, rfc_dir, verbose)
         id_map[dataset_id] = key
         save(f"{rfc_dir}{mode}_{id_map_file}", id_map)
 
@@ -90,7 +91,8 @@ def get_classifier_filename(mode : str,
 def classify_datasets(mode : str,
                       data_dict : dict,
                       id_map_file : str = 'id_map.npy',
-                      rfc_dir : str = 'classifiers/') -> pd.DataFrame :
+                      rfc_dir : str = 'classifiers/',
+                      verbose : bool = False) -> pd.DataFrame :
     """
     For each dataset, load the corresponding classifier and predict
 
@@ -99,6 +101,7 @@ def classify_datasets(mode : str,
         data_dict (dict): dictionary containing all datasets
         id_map_file (str, default='id_map.npy'): path to map of classifier ids
         rfc_dir (str, default='classifiers/'): path to classifier directory
+        verbose (bool, default=False): Print status updates
 
     Returns:
         DataFrame with columns SNID and PROB_KN
@@ -107,7 +110,7 @@ def classify_datasets(mode : str,
     for dataset_id, df in data_dict.items():
         # Load classifier corresponding to dataset
         classifier_name = get_classifier_filename(
-            mode, dataset_id, id_map_file, rfc_dir)
+            mode, dataset_id, id_map_file, rfc_dir, verbose)
             
         # Load classifier
         classifier_dict = load(classifier_name)
@@ -160,6 +163,9 @@ def parse_args() -> argparse.ArgumentParser:
                         type=str,
                         help='Name of ID map file in classifier directory',
                         default='id_map.npy')
+    parser.add_argument('--verbose',
+                        action='store_true',
+                        help='Print status updates')
 
     return parser
 
@@ -222,7 +228,8 @@ def classify_main(args):
         args.mode,
         load(args.datasets_file),
         args.id_map_file,
-        args.rfc_dir)
+        args.rfc_dir,
+        args.verbose)
 
     # Save results
     results.to_csv(f"{args.results_dir}{args.results_outfile}", index=False)
