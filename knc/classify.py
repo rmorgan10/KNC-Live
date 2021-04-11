@@ -42,9 +42,12 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -> pd.DataFrame :
     rfc = classifier_dict['rfc']
     feats = classifier_dict['feats']
     popt = classifier_dict['calibration_coeffs']
-
+    
     scores = rfc.predict_proba(data[feats])[:,1]
-    data['PROB_KN'] = calibrate(scores, popt)
+    if not popt is None:
+        data['PROB_KN'] = calibrate(scores, popt)
+    else:
+        data['PROB_KN'] = scores
     data['KN'] = [1 if x >= classifier_dict['prob_cutoff']
                   else 0 for x in data['PROB_KN'].values]
 
@@ -73,18 +76,29 @@ def get_classifier_filename(mode : str,
     if not rfc_dir.endswith('/'):
         rfc_dir += '/'
 
-    id_map = load(f"{rfc_dir}{mode}_{id_map_file}")
     try:
+        id_map = load(f"{rfc_dir}{mode}_{id_map_file}")
         key = id_map[dataset_id]
+        
+    except FileNotFoundError:
+        # Initialize the id map and train a classifier
+        key = 10000
+        id_map = {dataset_id : key}
+        if verbose:
+            print("No classifier found, training new classifier")
+        train.train_new(mode, dataset_id, key, rfc_dir, verbose)
+        
     except KeyError:
         if verbose:
             print("No classifier found, training new classifier")
         
         # Train a new classifier and update the id map
-        key = str(max([int(x) for x in id_map.values()]) + 1)
+        key = max([int(x) for x in id_map.values()]) + 1
         train.train_new(mode, dataset_id, key, rfc_dir, verbose)
         id_map[dataset_id] = key
-        save(f"{rfc_dir}{mode}_{id_map_file}", id_map)
+
+    # Save the updated id map
+    save(f"{rfc_dir}{mode}_{id_map_file}", id_map)
 
     return f"{rfc_dir}knclassifier_{mode}_{key}.npy"
 
@@ -106,8 +120,15 @@ def classify_datasets(mode : str,
     Returns:
         DataFrame with columns SNID and PROB_KN
     """
-    classified_data = []
+    out_data = []
+    count = 1
+    total = len(data_dict)
     for dataset_id, df in data_dict.items():
+        # Update status
+        if verbose:
+            print(f"Classifying dataset {count} of {total}")
+            count += 1
+        
         # Load classifier corresponding to dataset
         classifier_name = get_classifier_filename(
             mode, dataset_id, id_map_file, rfc_dir, verbose)
@@ -198,10 +219,9 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
     if not args.rfc_dir.endswith('/'):
         args.rfc_dir += '/'
     
-    # Check that the needed files exist
-    for filename in [args.datasets_file, args.rfc_dir + args.id_map_file]:
-        if filename is None or not os.path.exists(filename):
-            raise ArgumentError(f"{filename} not found")
+    # Check that the processed files exist
+    if not os.path.exists(args.datasets_file):
+        raise ArgumentError(f"{args.datasets_file} not found")
 
     # Check that the results directory can be made or exists
     if args.results_dir is not None:
@@ -224,7 +244,7 @@ def classify_main(args):
         args (argpars.Namespace): parsed arguments for classify.py
     """
     # Run classification
-    results = classify.classify_datasets(
+    results = classify_datasets(
         args.mode,
         load(args.datasets_file),
         args.id_map_file,

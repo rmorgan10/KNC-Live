@@ -61,7 +61,8 @@ for filename in lcs_files:
 
     # Extract features
     feat_df = fe.extract_all(
-        lcs, cut_requirement=2, obj=obj, sample=args.sample)
+        lcs, cut_requirement=2, obj=obj, sample=args.sample,
+        verbose=args.verbose)
     feature_dfs.append(feat_df)
 
 # Determine mode
@@ -81,6 +82,14 @@ if args.verbose:
     print("Organizing")
 datasets = process.organize_datasets(train_df)
 
-# Save featurized datasets
+# Save best featurized dataset
+count = 0
+best_id = None
 for dataset_id, feat_df in datasets.items():
-    feat_df.to_csv(f"{args.rfc_dir}training_data_{mode}.csv", index=False)
+    good_feats = dataset_id.count('F')
+    if good_feats > count:
+        best_id = dataset_id
+        count = good_feats
+
+datasets[best_id].to_csv(f"{args.rfc_dir}training_data_{mode}.csv",
+                         index=False)

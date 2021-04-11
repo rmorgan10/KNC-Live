@@ -64,16 +64,15 @@ if __name__ == '__main__':
     parser = parse_args()
     args = parser.parse_args()
 
-    # Validate arguments
+    # Validate process arguments and run
     if args.process:
         process_args = process.check_args(parser)
 
-    if args.classify:
-        classify_args = classify.check_args(parser)
-
-    # Run scripts
-    if args.process:
         process.process_main(process_args)
 
+
+    # Validate classify arguments and run
     if args.classify:
+        classify_args = classify.check_args(parser)
+        
         classify.classify_main(classify_args)

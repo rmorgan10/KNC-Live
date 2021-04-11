@@ -98,6 +98,7 @@ def organize_datasets(df : pd.DataFrame) -> dict :
     
 def run_processing(lcs_file : str,
                    results_dir : str = None,
+                   dataset_file : str = 'KNC_datasets.npy',
                    verbose : bool = False):
     """
     Run all processing steps on a lightcurve file and save results to disk
@@ -125,7 +126,7 @@ def run_processing(lcs_file : str,
     datasets = organize_datasets(feat_df)
 
     # Save results
-    save(f'{results_dir}/KNC_datasets.npy', datasets)
+    save(f'{dataset_file}', datasets)
 
 
 def parse_args() -> argparse.ArgumentParser :
@@ -147,6 +148,10 @@ def parse_args() -> argparse.ArgumentParser :
                         type=str,
                         help='Directory to save results',
                         default=None)
+    parser.add_argument('--datasets_file',
+                        type=str,
+                        help='Path to create datasets file',
+                        default='KNC_datasets.npy')
     parser.add_argument('--verbose',
                         action='store_true',
                         help='Print status updates')
@@ -182,7 +187,7 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
         if not os.path.exists(args.results_dir):
             
             try:
-                os.mkdir(results_dir)
+                os.mkdir(args.results_dir)
             except FileNotFoundError:
                 raise ArgumentError(f"{args.results_dir} is not valid")    
 
@@ -197,7 +202,8 @@ def process_main(args):
     """
 
     # Run data processing
-    process.run_processing(args.lcs_file, args.results_dir, args.verbose)
+    run_processing(
+        args.lcs_file, args.results_dir, args.datasets_file, args.verbose)
 
     
 if __name__ == "__main__":

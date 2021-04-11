@@ -81,7 +81,7 @@ def extract_all(lcs : dict,
     for snid, info in lcs.items():
         if info['cut'] > cut_requirement or info['cut'] == -1:
             flts = set(info['lightcurve']['FLT'].values)
-            data_dict = extract(info['lightcurve'], extractor, flts)
+            data_dict = extract(info['lightcurve'], extractor)
             data_dict['SNID'] = snid
             data_dict['OBJ'] = obj
             data.append(data_dict)
@@ -93,9 +93,10 @@ def extract_all(lcs : dict,
         if verbose and count % 50 == 0:
             progress = str(round(count / sample * 100.0, 2))
             sys.stdout.write(f"Progress: {progress} %    \r")
-            sys.flush()
+            sys.stdout.flush()
             
     # Construct and clean a DataFrame
+    
     df = pd.DataFrame(data)
     feats = df.columns
     df = df.dropna(how='all')
