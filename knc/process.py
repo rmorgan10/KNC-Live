@@ -147,7 +147,7 @@ def parse_args() -> argparse.ArgumentParser :
     parser.add_argument('--results_dir',
                         type=str,
                         help='Directory to save results',
-                        default=None)
+                        default='knc_results/')
     parser.add_argument('--datasets_file',
                         type=str,
                         help='Path to create datasets file',
@@ -183,13 +183,11 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
         raise ArgumentError(f"{args.lcs_file} not found")
 
     # Check that the results directory can be made or exists
-    if args.results_dir is not None:
-        if not os.path.exists(args.results_dir):
-            
-            try:
-                os.mkdir(args.results_dir)
-            except FileNotFoundError:
-                raise ArgumentError(f"{args.results_dir} is not valid")    
+    if not os.path.exists(args.results_dir):
+        try:
+            os.mkdir(args.results_dir)
+        except FileNotFoundError:
+            raise ArgumentError(f"{args.results_dir} is not valid")    
 
     return args
 

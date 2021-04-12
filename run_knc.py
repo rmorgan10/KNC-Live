@@ -43,7 +43,7 @@ def parse_args() -> argparse.ArgumentParser:
     parser.add_argument('--results_dir',
                         type=str,
                         help='Directory to save results',
-                        default=None)
+                        default='knc_results/')
     parser.add_argument('--rfc_dir',
                         type=str,
                         help='Path to directory containing classifiers',
