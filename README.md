@@ -80,7 +80,8 @@ usage: run_knc.py [-h] [--process] [--classify] [--lcs_file LCS_FILE]
                   [--datasets_file DATASETS_FILE] [--mode MODE]
                   [--results_outfile RESULTS_OUTFILE]
                   [--results_dir RESULTS_DIR] [--rfc_dir RFC_DIR]
-                  [--id_map_file ID_MAP_FILE] [--verbose]
+                  [--id_map_file ID_MAP_FILE] [--verbose] [--skip_cv]
+                  [--distribute]
 
 Run KN-Classify Live
 
@@ -99,6 +100,9 @@ optional arguments:
                         Directory to save results
   --rfc_dir RFC_DIR     Path to directory containing classifiers
   --verbose             Print status updates
+  --skip_cv             Skip hyperparam optimization
+  --distribute          Use multiprocessing
+
 ```
 
 **The `mode` Argument**:
