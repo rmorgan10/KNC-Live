@@ -46,7 +46,37 @@ def sigmoid(x : np.ndarray, a : float, b : float, c : float) -&gt; np.ndarray :
     Returns:
         evalutated sigmoid curve at x values for the given parameterization
     &#34;&#34;&#34;
-    return a / (b + np.exp(-1.0 * c * x))</code></pre>
+    return a / (b + np.exp(-1.0 * c * x))
+
+def load(filename : str) -&gt; object:
+    &#34;&#34;&#34;
+    Load a pickled file into memory. Warning: Only use on data you trust 
+    because this function overrides the default pickling allowance in numpy,
+    which is there for security reasons.
+
+    Args:
+        filename (str): path to file containing pickled object
+
+    Returns:
+        unpickled object
+    &#34;&#34;&#34;
+    return np.load(filename, allow_pickle=True).item()
+
+def save(filename : str, obj : object):
+    &#34;&#34;&#34;
+    Save an object by pickling
+
+    Args:
+        filename (str): path to file that will contain pickled object
+        obj (object): a python object you want to pickle
+    &#34;&#34;&#34;
+    np.save(filename, obj, allow_pickle=True)
+
+class ArgumentError(Exception):
+    &#34;&#34;&#34;
+    A class to raise errors for invalid arguments
+    &#34;&#34;&#34;
+    pass</code></pre>
 </details>
 </section>
 <section>
@@ -56,6 +86,66 @@ def sigmoid(x : np.ndarray, a : float, b : float, c : float) -&gt; np.ndarray :
 <section>
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
+<dt id="knc.utils.load"><code class="name flex">
+<span>def <span class="ident">load</span></span>(<span>filename: str) ‑> object</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Load a pickled file into memory. Warning: Only use on data you trust
+because this function overrides the default pickling allowance in numpy,
+which is there for security reasons.</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>filename</code></strong> :&ensp;<code>str</code></dt>
+<dd>path to file containing pickled object</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>unpickled object</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def load(filename : str) -&gt; object:
+    &#34;&#34;&#34;
+    Load a pickled file into memory. Warning: Only use on data you trust 
+    because this function overrides the default pickling allowance in numpy,
+    which is there for security reasons.
+
+    Args:
+        filename (str): path to file containing pickled object
+
+    Returns:
+        unpickled object
+    &#34;&#34;&#34;
+    return np.load(filename, allow_pickle=True).item()</code></pre>
+</details>
+</dd>
+<dt id="knc.utils.save"><code class="name flex">
+<span>def <span class="ident">save</span></span>(<span>filename: str, obj: object)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>Save an object by pickling</p>
+<h2 id="args">Args</h2>
+<dl>
+<dt><strong><code>filename</code></strong> :&ensp;<code>str</code></dt>
+<dd>path to file that will contain pickled object</dd>
+<dt><strong><code>obj</code></strong> :&ensp;<code>object</code></dt>
+<dd>a python object you want to pickle</dd>
+</dl></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">def save(filename : str, obj : object):
+    &#34;&#34;&#34;
+    Save an object by pickling
+
+    Args:
+        filename (str): path to file that will contain pickled object
+        obj (object): a python object you want to pickle
+    &#34;&#34;&#34;
+    np.save(filename, obj, allow_pickle=True)</code></pre>
+</details>
+</dd>
 <dt id="knc.utils.sigmoid"><code class="name flex">
 <span>def <span class="ident">sigmoid</span></span>(<span>x: numpy.ndarray, a: float, b: float, c: float) ‑> numpy.ndarray</span>
 </code></dt>
@@ -97,6 +187,31 @@ def sigmoid(x : np.ndarray, a : float, b : float, c : float) -&gt; np.ndarray :
 </dl>
 </section>
 <section>
+<h2 class="section-title" id="header-classes">Classes</h2>
+<dl>
+<dt id="knc.utils.ArgumentError"><code class="flex name class">
+<span>class <span class="ident">ArgumentError</span></span>
+<span>(</span><span>*args, **kwargs)</span>
+</code></dt>
+<dd>
+<div class="desc"><p>A class to raise errors for invalid arguments</p></div>
+<details class="source">
+<summary>
+<span>Expand source code</span>
+</summary>
+<pre><code class="python">class ArgumentError(Exception):
+    &#34;&#34;&#34;
+    A class to raise errors for invalid arguments
+    &#34;&#34;&#34;
+    pass</code></pre>
+</details>
+<h3>Ancestors</h3>
+<ul class="hlist">
+<li>builtins.Exception</li>
+<li>builtins.BaseException</li>
+</ul>
+</dd>
+</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -112,7 +227,16 @@ def sigmoid(x : np.ndarray, a : float, b : float, c : float) -&gt; np.ndarray :
 </li>
 <li><h3><a href="#header-functions">Functions</a></h3>
 <ul class="">
+<li><code><a title="knc.utils.load" href="#knc.utils.load">load</a></code></li>
+<li><code><a title="knc.utils.save" href="#knc.utils.save">save</a></code></li>
 <li><code><a title="knc.utils.sigmoid" href="#knc.utils.sigmoid">sigmoid</a></code></li>
+</ul>
+</li>
+<li><h3><a href="#header-classes">Classes</a></h3>
+<ul>
+<li>
+<h4><code><a title="knc.utils.ArgumentError" href="#knc.utils.ArgumentError">ArgumentError</a></code></h4>
+</li>
 </ul>
 </li>
 </ul>

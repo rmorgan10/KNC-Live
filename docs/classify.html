@@ -32,36 +32,15 @@ Classify datasets
 &#34;&#34;&#34;
 import argparse
 import os
+import sys
+sys.path.append(&#39;knc&#39;)
 
 import numpy as np
 import pandas as pd
 
-try:
-    import train
-    from utils import sigmoid
-except ModuleNotFoundError:
-    import sys
-    sys.path.append(&#39;knc&#39;)
-    import train
-    from utils import sigmoid
+import train
+from utils import sigmoid, ArgumentError, load, save
 
-class ArgumentError(Exception):
-    &#34;&#34;&#34;
-    A class to raise errors for invalid arguments
-    &#34;&#34;&#34;
-    pass
-
-def load_classifier(filename : str) -&gt; dict :
-    &#34;&#34;&#34;
-    Load a classifier from a pickled file
-
-    Args:
-        filename (str): name of classifer file
-
-    Returns:
-        dictionary of classifier and features to use
-    &#34;&#34;&#34;
-    return np.load(filename, allow_pickle=True).item()
 
 def calibrate(scores: np.ndarray, popt : list) -&gt; np.ndarray :
     &#34;&#34;&#34;
@@ -92,26 +71,37 @@ def predict(classifier_dict : dict, data : pd.DataFrame) -&gt; pd.DataFrame :
     rfc = classifier_dict[&#39;rfc&#39;]
     feats = classifier_dict[&#39;feats&#39;]
     popt = classifier_dict[&#39;calibration_coeffs&#39;]
-
+    
     scores = rfc.predict_proba(data[feats])[:,1]
-    data[&#39;PROB_KN&#39;] = calibrate(scores, popt)
+    if not popt is None:
+        data[&#39;PROB_KN&#39;] = calibrate(scores, popt)
+    else:
+        data[&#39;PROB_KN&#39;] = scores
     data[&#39;KN&#39;] = [1 if x &gt;= classifier_dict[&#39;prob_cutoff&#39;]
                   else 0 for x in data[&#39;PROB_KN&#39;].values]
 
     return data
 
 
-def get_classifier_filename(dataset_id : str,
+def get_classifier_filename(mode : str,
+                            dataset_id : str,
                             id_map_file : str = &#39;id_map.npy&#39;,
-                            rfc_dir : str = &#39;classifiers/&#39;) -&gt; str:
+                            rfc_dir : str = &#39;classifiers/&#39;,
+                            verbose : bool = False,
+                            skip_cv : bool = False,
+                            distribute : bool = False) -&gt; str:
     &#34;&#34;&#34;
     Given a classifier ID, return the filepath to the classifier. Trains
     a new classifier if no classifiers match the ID.
 
     Args:
+        mode (str): Type of classifier (&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;)
         dataset_id (str): ID string for the dataset
         id_map_file (str, default=&#39;id_map.npy&#39;): path to map of classifier ids
         rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+        verbose (bool, default=False): Print status updates
+        skip_cv (bool, default=False): Skip hyperparam optimization
+        distribute (bool, default=False): Use multiprocessing
 
     Returns:
         filename of the classifier
@@ -119,40 +109,71 @@ def get_classifier_filename(dataset_id : str,
     if not rfc_dir.endswith(&#39;/&#39;):
         rfc_dir += &#39;/&#39;
 
-    id_map = load_classifier(f&#34;{rfc_dir}{id_map_file}&#34;)
     try:
+        id_map = load(f&#34;{rfc_dir}{mode}_{id_map_file}&#34;)
         key = id_map[dataset_id]
+        
+    except FileNotFoundError:
+        # Initialize the id map and train a classifier
+        key = 10000
+        id_map = {dataset_id : key}
+        if verbose:
+            print(&#34;No classifier found, training new classifier&#34;)
+        train.train_new(
+            mode, dataset_id, key, rfc_dir, verbose, skip_cv, distribute)
+        
     except KeyError:
+        if verbose:
+            print(&#34;No classifier found, training new classifier&#34;)
+        
         # Train a new classifier and update the id map
-        key = str(max([int(x) for x in id_map.values()]) + 1)
-        train.train_new(dataset_id, key, rfc_dir)
+        key = max([int(x) for x in id_map.values()]) + 1
+        train.train_new(mode, dataset_id, key, rfc_dir, verbose)
         id_map[dataset_id] = key
-        np.save(f&#34;{rfc_dir}{id_map_file}&#34;, id_map, allow_pickle=True)
 
-    return f&#34;{rfc_dir}knclassifier_{key}.npy&#34;
+    # Save the updated id map
+    save(f&#34;{rfc_dir}{mode}_{id_map_file}&#34;, id_map)
 
-def classify_datasets(data_dict : dict,
+    return f&#34;{rfc_dir}knclassifier_{mode}_{key}.npy&#34;
+
+def classify_datasets(mode : str,
+                      data_dict : dict,
                       id_map_file : str = &#39;id_map.npy&#39;,
-                      rfc_dir : str = &#39;classifiers/&#39;) -&gt; pd.DataFrame :
+                      rfc_dir : str = &#39;classifiers/&#39;,
+                      verbose : bool = False,
+                      skip_cv : bool = False,
+                      distribute : bool = False) -&gt; pd.DataFrame :
     &#34;&#34;&#34;
     For each dataset, load the corresponding classifier and predict
 
     Args:
+        mode (str): Type of classifier (&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;)  
         data_dict (dict): dictionary containing all datasets
         id_map_file (str, default=&#39;id_map.npy&#39;): path to map of classifier ids
         rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+        verbose (bool, default=False): Print status updates
+        skip_cv (bool, default=False): Skip hyperparam optimization
+        distribute (bool, default=False): Use multiprocessing
 
     Returns:
         DataFrame with columns SNID and PROB_KN
     &#34;&#34;&#34;
-    classified_data = []
+    out_data = []
+    count = 1
+    total = len(data_dict)
     for dataset_id, df in data_dict.items():
+        # Update status
+        if verbose:
+            print(f&#34;Classifying dataset {count} of {total}&#34;)
+            count += 1
+        
         # Load classifier corresponding to dataset
         classifier_name = get_classifier_filename(
-            dataset_id, id_map_file, rfc_dir)
+            mode, dataset_id, id_map_file, rfc_dir, verbose, skip_cv,
+            distribute)
             
         # Load classifier
-        classifier_dict = load_classifier(classifier_name)
+        classifier_dict = load(classifier_name)
         
         # Remove rows with infs and NaNs
         data = train.Data(df)
@@ -164,7 +185,7 @@ def classify_datasets(data_dict : dict,
                                                   res[&#39;PROB_KN&#39;].values,
                                                   res[&#39;KN&#39;].values)]
 
-    return pd.DataFrame(data=out_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;])
+    return pd.DataFrame(data=out_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;, &#39;KN&#39;])
 
 
 def parse_args() -&gt; argparse.ArgumentParser:
@@ -180,6 +201,11 @@ def parse_args() -&gt; argparse.ArgumentParser:
     parser.add_argument(&#39;--datasets_file&#39;,
                         type=str,
                         help=&#39;Path to datasets file&#39;,
+                        required=True)
+    parser.add_argument(&#39;--mode&#39;,
+                        type=str,
+                        help=(&#39;Type of data to classify. r=realtime, f=full, r&#39;
+                              &#39;fp=realtime+force_photo, ffp=full+force_photo&#39;),
                         required=True)
     parser.add_argument(&#39;--results_outfile&#39;,
                         type=str,
@@ -197,6 +223,15 @@ def parse_args() -&gt; argparse.ArgumentParser:
                         type=str,
                         help=&#39;Name of ID map file in classifier directory&#39;,
                         default=&#39;id_map.npy&#39;)
+    parser.add_argument(&#39;--verbose&#39;,
+                        action=&#39;store_true&#39;,
+                        help=&#39;Print status updates&#39;)
+    parser.add_argument(&#39;--skip_cv&#39;,
+                        action=&#39;store_true&#39;,
+                        help=&#39;Skip hyperparam optimization&#39;)
+    parser.add_argument(&#39;--distribute&#39;,
+                        action=&#39;store_true&#39;,
+                        help=&#39;Use multiprocessing&#39;)
 
     return parser
 
@@ -211,6 +246,7 @@ def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
         The parsed arguments if all arguments are valid
 
     Raises:
+        knc.ArgumentError if mode not in (&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;)
         knc.ArgumentError if rfc_dir is not found
         knc.ArgumentError if id_map_file is not found
         knc.ArgumentError if datasets_file is not found
@@ -218,16 +254,19 @@ def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
     &#34;&#34;&#34;
     args = parser.parse_args()
 
-    # Check the the classifiers directory exists
+    # Check that the mode is valid
+    if not args.mode in [&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;]:
+        raise ArgumentError(f&#34;{args.mode} must be r, f, rfp, or ffp&#34;)
+
+    # Check that the classifiers directory exists
     if not os.path.exists(args.rfc_dir):
         raise ArgumentError(f&#34;{args.rfc_dir} not found&#34;)
     if not args.rfc_dir.endswith(&#39;/&#39;):
         args.rfc_dir += &#39;/&#39;
     
-    # Check that the needed files exist
-    for filename in [args.datasets_file, args.rfc_dir + args.id_map_file]:
-        if not os.path.exists(filename):
-            raise ArgumentError(f&#34;{filename} not found&#34;)
+    # Check that the processed files exist
+    if not os.path.exists(args.datasets_file):
+        raise ArgumentError(f&#34;{args.datasets_file} not found&#34;)
 
     # Check that the results directory can be made or exists
     if args.results_dir is not None:
@@ -250,10 +289,13 @@ def classify_main(args):
         args (argpars.Namespace): parsed arguments for classify.py
     &#34;&#34;&#34;
     # Run classification
-    results = classify.classify_datasets(
-        load_classifier(args.datasets_file),
+    results = classify_datasets(
+        args.mode,
+        load(args.datasets_file),
         args.id_map_file,
-        args.rfc_dir)
+        args.rfc_dir,
+        args.verbose,
+        args.skip_cv)
 
     # Save results
     results.to_csv(f&#34;{args.results_dir}{args.results_outfile}&#34;, index=False)
@@ -322,7 +364,8 @@ if __name__ == &#34;__main__&#34;:
 <h2 id="returns">Returns</h2>
 <p>The parsed arguments if all arguments are valid</p>
 <h2 id="raises">Raises</h2>
-<p>knc.ArgumentError if rfc_dir is not found
+<p>knc.ArgumentError if mode not in ('r', 'f', 'rfp', 'ffp')
+knc.ArgumentError if rfc_dir is not found
 knc.ArgumentError if id_map_file is not found
 knc.ArgumentError if datasets_file is not found
 knc.ArgumentError if results_dir cannot be found or created</p></div>
@@ -341,6 +384,7 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
         The parsed arguments if all arguments are valid
 
     Raises:
+        knc.ArgumentError if mode not in (&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;)
         knc.ArgumentError if rfc_dir is not found
         knc.ArgumentError if id_map_file is not found
         knc.ArgumentError if datasets_file is not found
@@ -348,16 +392,19 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
     &#34;&#34;&#34;
     args = parser.parse_args()
 
-    # Check the the classifiers directory exists
+    # Check that the mode is valid
+    if not args.mode in [&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;]:
+        raise ArgumentError(f&#34;{args.mode} must be r, f, rfp, or ffp&#34;)
+
+    # Check that the classifiers directory exists
     if not os.path.exists(args.rfc_dir):
         raise ArgumentError(f&#34;{args.rfc_dir} not found&#34;)
     if not args.rfc_dir.endswith(&#39;/&#39;):
         args.rfc_dir += &#39;/&#39;
     
-    # Check that the needed files exist
-    for filename in [args.datasets_file, args.rfc_dir + args.id_map_file]:
-        if not os.path.exists(filename):
-            raise ArgumentError(f&#34;{filename} not found&#34;)
+    # Check that the processed files exist
+    if not os.path.exists(args.datasets_file):
+        raise ArgumentError(f&#34;{args.datasets_file} not found&#34;)
 
     # Check that the results directory can be made or exists
     if args.results_dir is not None:
@@ -374,45 +421,70 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
 </details>
 </dd>
 <dt id="knc.classify.classify_datasets"><code class="name flex">
-<span>def <span class="ident">classify_datasets</span></span>(<span>data_dict: dict, id_map_file: str = 'id_map.npy', rfc_dir: str = 'classifiers/') ‑> pandas.core.frame.DataFrame</span>
+<span>def <span class="ident">classify_datasets</span></span>(<span>mode: str, data_dict: dict, id_map_file: str = 'id_map.npy', rfc_dir: str = 'classifiers/', verbose: bool = False, skip_cv: bool = False, distribute: bool = False) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <div class="desc"><p>For each dataset, load the corresponding classifier and predict</p>
 <h2 id="args">Args</h2>
 <dl>
+<dt><strong><code>mode</code></strong> :&ensp;<code>str</code></dt>
+<dd>Type of classifier ('r', 'f', 'rfp', 'ffp')
+</dd>
 <dt><strong><code>data_dict</code></strong> :&ensp;<code>dict</code></dt>
 <dd>dictionary containing all datasets</dd>
+<dt>id_map_file (str, default='id_map.npy'): path to map of classifier ids</dt>
+<dt>rfc_dir (str, default='classifiers/'): path to classifier directory</dt>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Print status updates</dd>
+<dt><strong><code>skip_cv</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Skip hyperparam optimization</dd>
+<dt><strong><code>distribute</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Use multiprocessing</dd>
 </dl>
-<p>id_map_file (str, default='id_map.npy'): path to map of classifier ids
-rfc_dir (str, default='classifiers/'): path to classifier directory</p>
 <h2 id="returns">Returns</h2>
 <p>DataFrame with columns SNID and PROB_KN</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def classify_datasets(data_dict : dict,
+<pre><code class="python">def classify_datasets(mode : str,
+                      data_dict : dict,
                       id_map_file : str = &#39;id_map.npy&#39;,
-                      rfc_dir : str = &#39;classifiers/&#39;) -&gt; pd.DataFrame :
+                      rfc_dir : str = &#39;classifiers/&#39;,
+                      verbose : bool = False,
+                      skip_cv : bool = False,
+                      distribute : bool = False) -&gt; pd.DataFrame :
     &#34;&#34;&#34;
     For each dataset, load the corresponding classifier and predict
 
     Args:
+        mode (str): Type of classifier (&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;)  
         data_dict (dict): dictionary containing all datasets
         id_map_file (str, default=&#39;id_map.npy&#39;): path to map of classifier ids
         rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+        verbose (bool, default=False): Print status updates
+        skip_cv (bool, default=False): Skip hyperparam optimization
+        distribute (bool, default=False): Use multiprocessing
 
     Returns:
         DataFrame with columns SNID and PROB_KN
     &#34;&#34;&#34;
-    classified_data = []
+    out_data = []
+    count = 1
+    total = len(data_dict)
     for dataset_id, df in data_dict.items():
+        # Update status
+        if verbose:
+            print(f&#34;Classifying dataset {count} of {total}&#34;)
+            count += 1
+        
         # Load classifier corresponding to dataset
         classifier_name = get_classifier_filename(
-            dataset_id, id_map_file, rfc_dir)
+            mode, dataset_id, id_map_file, rfc_dir, verbose, skip_cv,
+            distribute)
             
         # Load classifier
-        classifier_dict = load_classifier(classifier_name)
+        classifier_dict = load(classifier_name)
         
         # Remove rows with infs and NaNs
         data = train.Data(df)
@@ -424,7 +496,7 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
                                                   res[&#39;PROB_KN&#39;].values,
                                                   res[&#39;KN&#39;].values)]
 
-    return pd.DataFrame(data=out_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;])</code></pre>
+    return pd.DataFrame(data=out_data, columns=[&#39;SNID&#39;, &#39;PROB_KN&#39;, &#39;KN&#39;])</code></pre>
 </details>
 </dd>
 <dt id="knc.classify.classify_main"><code class="name flex">
@@ -449,45 +521,64 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
         args (argpars.Namespace): parsed arguments for classify.py
     &#34;&#34;&#34;
     # Run classification
-    results = classify.classify_datasets(
-        load_classifier(args.datasets_file),
+    results = classify_datasets(
+        args.mode,
+        load(args.datasets_file),
         args.id_map_file,
-        args.rfc_dir)
+        args.rfc_dir,
+        args.verbose,
+        args.skip_cv)
 
     # Save results
     results.to_csv(f&#34;{args.results_dir}{args.results_outfile}&#34;, index=False)</code></pre>
 </details>
 </dd>
 <dt id="knc.classify.get_classifier_filename"><code class="name flex">
-<span>def <span class="ident">get_classifier_filename</span></span>(<span>dataset_id: str, id_map_file: str = 'id_map.npy', rfc_dir: str = 'classifiers/') ‑> str</span>
+<span>def <span class="ident">get_classifier_filename</span></span>(<span>mode: str, dataset_id: str, id_map_file: str = 'id_map.npy', rfc_dir: str = 'classifiers/', verbose: bool = False, skip_cv: bool = False, distribute: bool = False) ‑> str</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Given a classifier ID, return the filepath to the classifier. Trains
 a new classifier if no classifiers match the ID.</p>
 <h2 id="args">Args</h2>
 <dl>
+<dt><strong><code>mode</code></strong> :&ensp;<code>str</code></dt>
+<dd>Type of classifier ('r', 'f', 'rfp', 'ffp')</dd>
 <dt><strong><code>dataset_id</code></strong> :&ensp;<code>str</code></dt>
 <dd>ID string for the dataset</dd>
+<dt>id_map_file (str, default='id_map.npy'): path to map of classifier ids</dt>
+<dt>rfc_dir (str, default='classifiers/'): path to classifier directory</dt>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Print status updates</dd>
+<dt><strong><code>skip_cv</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Skip hyperparam optimization</dd>
+<dt><strong><code>distribute</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Use multiprocessing</dd>
 </dl>
-<p>id_map_file (str, default='id_map.npy'): path to map of classifier ids
-rfc_dir (str, default='classifiers/'): path to classifier directory</p>
 <h2 id="returns">Returns</h2>
 <p>filename of the classifier</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def get_classifier_filename(dataset_id : str,
+<pre><code class="python">def get_classifier_filename(mode : str,
+                            dataset_id : str,
                             id_map_file : str = &#39;id_map.npy&#39;,
-                            rfc_dir : str = &#39;classifiers/&#39;) -&gt; str:
+                            rfc_dir : str = &#39;classifiers/&#39;,
+                            verbose : bool = False,
+                            skip_cv : bool = False,
+                            distribute : bool = False) -&gt; str:
     &#34;&#34;&#34;
     Given a classifier ID, return the filepath to the classifier. Trains
     a new classifier if no classifiers match the ID.
 
     Args:
+        mode (str): Type of classifier (&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;)
         dataset_id (str): ID string for the dataset
         id_map_file (str, default=&#39;id_map.npy&#39;): path to map of classifier ids
         rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+        verbose (bool, default=False): Print status updates
+        skip_cv (bool, default=False): Skip hyperparam optimization
+        distribute (bool, default=False): Use multiprocessing
 
     Returns:
         filename of the classifier
@@ -495,46 +586,32 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
     if not rfc_dir.endswith(&#39;/&#39;):
         rfc_dir += &#39;/&#39;
 
-    id_map = load_classifier(f&#34;{rfc_dir}{id_map_file}&#34;)
     try:
+        id_map = load(f&#34;{rfc_dir}{mode}_{id_map_file}&#34;)
         key = id_map[dataset_id]
+        
+    except FileNotFoundError:
+        # Initialize the id map and train a classifier
+        key = 10000
+        id_map = {dataset_id : key}
+        if verbose:
+            print(&#34;No classifier found, training new classifier&#34;)
+        train.train_new(
+            mode, dataset_id, key, rfc_dir, verbose, skip_cv, distribute)
+        
     except KeyError:
+        if verbose:
+            print(&#34;No classifier found, training new classifier&#34;)
+        
         # Train a new classifier and update the id map
-        key = str(max([int(x) for x in id_map.values()]) + 1)
-        train.train_new(dataset_id, key, rfc_dir)
+        key = max([int(x) for x in id_map.values()]) + 1
+        train.train_new(mode, dataset_id, key, rfc_dir, verbose)
         id_map[dataset_id] = key
-        np.save(f&#34;{rfc_dir}{id_map_file}&#34;, id_map, allow_pickle=True)
 
-    return f&#34;{rfc_dir}knclassifier_{key}.npy&#34;</code></pre>
-</details>
-</dd>
-<dt id="knc.classify.load_classifier"><code class="name flex">
-<span>def <span class="ident">load_classifier</span></span>(<span>filename: str) ‑> dict</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Load a classifier from a pickled file</p>
-<h2 id="args">Args</h2>
-<dl>
-<dt><strong><code>filename</code></strong> :&ensp;<code>str</code></dt>
-<dd>name of classifer file</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<p>dictionary of classifier and features to use</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def load_classifier(filename : str) -&gt; dict :
-    &#34;&#34;&#34;
-    Load a classifier from a pickled file
+    # Save the updated id map
+    save(f&#34;{rfc_dir}{mode}_{id_map_file}&#34;, id_map)
 
-    Args:
-        filename (str): name of classifer file
-
-    Returns:
-        dictionary of classifier and features to use
-    &#34;&#34;&#34;
-    return np.load(filename, allow_pickle=True).item()</code></pre>
+    return f&#34;{rfc_dir}knclassifier_{mode}_{key}.npy&#34;</code></pre>
 </details>
 </dd>
 <dt id="knc.classify.parse_args"><code class="name flex">
@@ -562,6 +639,11 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
                         type=str,
                         help=&#39;Path to datasets file&#39;,
                         required=True)
+    parser.add_argument(&#39;--mode&#39;,
+                        type=str,
+                        help=(&#39;Type of data to classify. r=realtime, f=full, r&#39;
+                              &#39;fp=realtime+force_photo, ffp=full+force_photo&#39;),
+                        required=True)
     parser.add_argument(&#39;--results_outfile&#39;,
                         type=str,
                         help=&#39;Filename to store results&#39;,
@@ -578,6 +660,15 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
                         type=str,
                         help=&#39;Name of ID map file in classifier directory&#39;,
                         default=&#39;id_map.npy&#39;)
+    parser.add_argument(&#39;--verbose&#39;,
+                        action=&#39;store_true&#39;,
+                        help=&#39;Print status updates&#39;)
+    parser.add_argument(&#39;--skip_cv&#39;,
+                        action=&#39;store_true&#39;,
+                        help=&#39;Skip hyperparam optimization&#39;)
+    parser.add_argument(&#39;--distribute&#39;,
+                        action=&#39;store_true&#39;,
+                        help=&#39;Use multiprocessing&#39;)
 
     return parser</code></pre>
 </details>
@@ -614,9 +705,12 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
     rfc = classifier_dict[&#39;rfc&#39;]
     feats = classifier_dict[&#39;feats&#39;]
     popt = classifier_dict[&#39;calibration_coeffs&#39;]
-
+    
     scores = rfc.predict_proba(data[feats])[:,1]
-    data[&#39;PROB_KN&#39;] = calibrate(scores, popt)
+    if not popt is None:
+        data[&#39;PROB_KN&#39;] = calibrate(scores, popt)
+    else:
+        data[&#39;PROB_KN&#39;] = scores
     data[&#39;KN&#39;] = [1 if x &gt;= classifier_dict[&#39;prob_cutoff&#39;]
                   else 0 for x in data[&#39;PROB_KN&#39;].values]
 
@@ -626,31 +720,6 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
 </dl>
 </section>
 <section>
-<h2 class="section-title" id="header-classes">Classes</h2>
-<dl>
-<dt id="knc.classify.ArgumentError"><code class="flex name class">
-<span>class <span class="ident">ArgumentError</span></span>
-<span>(</span><span>*args, **kwargs)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>A class to raise errors for invalid arguments</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">class ArgumentError(Exception):
-    &#34;&#34;&#34;
-    A class to raise errors for invalid arguments
-    &#34;&#34;&#34;
-    pass</code></pre>
-</details>
-<h3>Ancestors</h3>
-<ul class="hlist">
-<li>builtins.Exception</li>
-<li>builtins.BaseException</li>
-</ul>
-</dd>
-</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -671,16 +740,8 @@ rfc_dir (str, default='classifiers/'): path to classifier directory</p>
 <li><code><a title="knc.classify.classify_datasets" href="#knc.classify.classify_datasets">classify_datasets</a></code></li>
 <li><code><a title="knc.classify.classify_main" href="#knc.classify.classify_main">classify_main</a></code></li>
 <li><code><a title="knc.classify.get_classifier_filename" href="#knc.classify.get_classifier_filename">get_classifier_filename</a></code></li>
-<li><code><a title="knc.classify.load_classifier" href="#knc.classify.load_classifier">load_classifier</a></code></li>
 <li><code><a title="knc.classify.parse_args" href="#knc.classify.parse_args">parse_args</a></code></li>
 <li><code><a title="knc.classify.predict" href="#knc.classify.predict">predict</a></code></li>
-</ul>
-</li>
-<li><h3><a href="#header-classes">Classes</a></h3>
-<ul>
-<li>
-<h4><code><a title="knc.classify.ArgumentError" href="#knc.classify.ArgumentError">ArgumentError</a></code></h4>
-</li>
 </ul>
 </li>
 </ul>

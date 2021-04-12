@@ -32,34 +32,52 @@ Functionalities to process a lightcurve file for KN-Classify
 &#34;&#34;&#34;
 import argparse
 import os
+import sys
+sys.path.append(&#39;knc&#39;)
 
 import numpy as np
 import pandas as pd
 
-try:
-    import feature_extraction
-except ModuleNotFoundError:
-    import sys
-    sys.path.append(&#39;knc&#39;)
-    import feature_extraction
+import feature_extraction
+from utils import ArgumentError, load, save
 
-class ArgumentError(Exception):
-    &#34;&#34;&#34;
-    A class to raise errors for invalid arguments
-    &#34;&#34;&#34;
-    pass
 
-def read_lightcurves(filename : str) -&gt; dict :
+def trim_lcs(lcs : dict, cut_requirement : int = 0) -&gt; dict :
     &#34;&#34;&#34;
-    Open a lightcurve file and return the pickeled dictionary
+    Remove epochs from a lightcurve that occur before object discovery, which
+    is defined as the first mjd with SNR &gt;= 3.0.
 
     Args:
-        filename (str): Path to lightcurve file
+        lcs (dict): dictionary from a lightcurve file
+        cut_requirement (int, default=0): cut number to require
 
     Returns:
-        dictionary containing lightcurves from pickeled file
+        copy of lcs with pre-discovery epochs removed from each lightcurve
     &#34;&#34;&#34;
-    return np.load(filename).item()
+    out_lcs = {}
+    for snid, info in lcs.items():
+        
+        # Skip if the lightcurve will get cut during feature extraction
+        if not (info[&#39;cut&#39;] == -1 or info[&#39;cut&#39;] &gt; cut_requirement):
+            continue
+
+        # Get discovery MJD, skip if light curve is never discovered
+        flux = info[&#39;lightcurve&#39;][&#39;FLUXCAL&#39;].values.astype(float)
+        fluxerr = info[&#39;lightcurve&#39;][&#39;FLUXCALERR&#39;].values.astype(float)
+        detection_mask = ((flux / fluxerr) &gt;= 3.0)
+        if sum(detection_mask) == 0:
+            continue
+
+        mjds = info[&#39;lightcurve&#39;][&#39;MJD&#39;].values.astype(float)
+        mjd0 = mjds[detection_mask].min()
+
+        # Trim lightcurve
+        lc = info[&#39;lightcurve&#39;][mjds &gt;= mjd0].copy().reset_index(drop=True)
+
+        # Store results
+        out_lcs[snid] = {&#39;lightcurve&#39;: lc, &#39;cut&#39;: info[&#39;cut&#39;]}
+
+    return out_lcs
 
 
 def organize_datasets(df : pd.DataFrame) -&gt; dict :
@@ -103,28 +121,21 @@ def organize_datasets(df : pd.DataFrame) -&gt; dict :
     # Store datasets in a dictionary
     datasets = {k: pd.DataFrame(data=v, columns=df.columns).drop(
         labels=bad_cols[k], axis=1)
-                for k, v in groups.iteritems()}
+                for k, v in groups.items()}
 
     return datasets
     
-def save_datasets(outfile : str, datasets : dict):
-    &#34;&#34;&#34;
-    Write datasets to a file
-
-    Args:
-        outfile (str): filename to store datasets
-        datasets (dict):  A dict mapping dataset identifiers to the datasets 
-    &#34;&#34;&#34;
-    np.save(outfile, datasets, allow_pickle=True)
-
-
-def run_processing(lcs_file : str, results_dir : str = None):
+def run_processing(lcs_file : str,
+                   results_dir : str = None,
+                   dataset_file : str = &#39;KNC_datasets.npy&#39;,
+                   verbose : bool = False):
     &#34;&#34;&#34;
     Run all processing steps on a lightcurve file and save results to disk
 
     Args:
         lcs_file (str): Path to lightcurve file
         results_dir (str, optional, default=None): directory to save results
+        verbose (bool, default=False): print status updates
     &#34;&#34;&#34;
     # Establish the results directory
     if results_dir is None:
@@ -135,16 +146,16 @@ def run_processing(lcs_file : str, results_dir : str = None):
         os.mkdir(results_dir)
 
     # Load data
-    lcs = read_lightcurves(lcs_file)
+    lcs = load(lcs_file)
 
     # Extract features
-    feat_df = feature_extraction.extract_all(lcs)
+    feat_df = feature_extraction.extract_all(lcs, verbose=verbose)
 
     # Organize into datasets
     datasets = organize_datasets(feat_df)
 
     # Save results
-    save_datasets(f&#39;{results_dir}/KNC_datasets.npy&#39;, datasets)
+    save(f&#39;{dataset_file}&#39;, datasets)
 
 
 def parse_args() -&gt; argparse.ArgumentParser :
@@ -166,6 +177,13 @@ def parse_args() -&gt; argparse.ArgumentParser :
                         type=str,
                         help=&#39;Directory to save results&#39;,
                         default=None)
+    parser.add_argument(&#39;--datasets_file&#39;,
+                        type=str,
+                        help=&#39;Path to create datasets file&#39;,
+                        default=&#39;KNC_datasets.npy&#39;)
+    parser.add_argument(&#39;--verbose&#39;,
+                        action=&#39;store_true&#39;,
+                        help=&#39;Print status updates&#39;)
 
     return parser
 
@@ -198,7 +216,7 @@ def check_args(parser : argparse.ArgumentParser) -&gt; argparse.Namespace :
         if not os.path.exists(args.results_dir):
             
             try:
-                os.mkdir(results_dir)
+                os.mkdir(args.results_dir)
             except FileNotFoundError:
                 raise ArgumentError(f&#34;{args.results_dir} is not valid&#34;)    
 
@@ -213,7 +231,8 @@ def process_main(args):
     &#34;&#34;&#34;
 
     # Run data processing
-    process.run_processing(args.lcs_file, args.results_dir)
+    run_processing(
+        args.lcs_file, args.results_dir, args.datasets_file, args.verbose)
 
     
 if __name__ == &#34;__main__&#34;:
@@ -281,7 +300,7 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
         if not os.path.exists(args.results_dir):
             
             try:
-                os.mkdir(results_dir)
+                os.mkdir(args.results_dir)
             except FileNotFoundError:
                 raise ArgumentError(f&#34;{args.results_dir} is not valid&#34;)    
 
@@ -345,7 +364,7 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
     # Store datasets in a dictionary
     datasets = {k: pd.DataFrame(data=v, columns=df.columns).drop(
         labels=bad_cols[k], axis=1)
-                for k, v in groups.iteritems()}
+                for k, v in groups.items()}
 
     return datasets</code></pre>
 </details>
@@ -380,6 +399,13 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
                         type=str,
                         help=&#39;Directory to save results&#39;,
                         default=None)
+    parser.add_argument(&#39;--datasets_file&#39;,
+                        type=str,
+                        help=&#39;Path to create datasets file&#39;,
+                        default=&#39;KNC_datasets.npy&#39;)
+    parser.add_argument(&#39;--verbose&#39;,
+                        action=&#39;store_true&#39;,
+                        help=&#39;Print status updates&#39;)
 
     return parser</code></pre>
 </details>
@@ -407,40 +433,12 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
     &#34;&#34;&#34;
 
     # Run data processing
-    process.run_processing(args.lcs_file, args.results_dir)</code></pre>
-</details>
-</dd>
-<dt id="knc.process.read_lightcurves"><code class="name flex">
-<span>def <span class="ident">read_lightcurves</span></span>(<span>filename: str) ‑> dict</span>
-</code></dt>
-<dd>
-<div class="desc"><p>Open a lightcurve file and return the pickeled dictionary</p>
-<h2 id="args">Args</h2>
-<dl>
-<dt><strong><code>filename</code></strong> :&ensp;<code>str</code></dt>
-<dd>Path to lightcurve file</dd>
-</dl>
-<h2 id="returns">Returns</h2>
-<p>dictionary containing lightcurves from pickeled file</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">def read_lightcurves(filename : str) -&gt; dict :
-    &#34;&#34;&#34;
-    Open a lightcurve file and return the pickeled dictionary
-
-    Args:
-        filename (str): Path to lightcurve file
-
-    Returns:
-        dictionary containing lightcurves from pickeled file
-    &#34;&#34;&#34;
-    return np.load(filename).item()</code></pre>
+    run_processing(
+        args.lcs_file, args.results_dir, args.datasets_file, args.verbose)</code></pre>
 </details>
 </dd>
 <dt id="knc.process.run_processing"><code class="name flex">
-<span>def <span class="ident">run_processing</span></span>(<span>lcs_file: str, results_dir: str = None)</span>
+<span>def <span class="ident">run_processing</span></span>(<span>lcs_file: str, results_dir: str = None, dataset_file: str = 'KNC_datasets.npy', verbose: bool = False)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Run all processing steps on a lightcurve file and save results to disk</p>
@@ -450,18 +448,24 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
 <dd>Path to lightcurve file</dd>
 <dt><strong><code>results_dir</code></strong> :&ensp;<code>str</code>, optional, default=<code>None</code></dt>
 <dd>directory to save results</dd>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>print status updates</dd>
 </dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def run_processing(lcs_file : str, results_dir : str = None):
+<pre><code class="python">def run_processing(lcs_file : str,
+                   results_dir : str = None,
+                   dataset_file : str = &#39;KNC_datasets.npy&#39;,
+                   verbose : bool = False):
     &#34;&#34;&#34;
     Run all processing steps on a lightcurve file and save results to disk
 
     Args:
         lcs_file (str): Path to lightcurve file
         results_dir (str, optional, default=None): directory to save results
+        verbose (bool, default=False): print status updates
     &#34;&#34;&#34;
     # Establish the results directory
     if results_dir is None:
@@ -472,73 +476,78 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
         os.mkdir(results_dir)
 
     # Load data
-    lcs = read_lightcurves(lcs_file)
+    lcs = load(lcs_file)
 
     # Extract features
-    feat_df = feature_extraction.extract_all(lcs)
+    feat_df = feature_extraction.extract_all(lcs, verbose=verbose)
 
     # Organize into datasets
     datasets = organize_datasets(feat_df)
 
     # Save results
-    save_datasets(f&#39;{results_dir}/KNC_datasets.npy&#39;, datasets)</code></pre>
+    save(f&#39;{dataset_file}&#39;, datasets)</code></pre>
 </details>
 </dd>
-<dt id="knc.process.save_datasets"><code class="name flex">
-<span>def <span class="ident">save_datasets</span></span>(<span>outfile: str, datasets: dict)</span>
+<dt id="knc.process.trim_lcs"><code class="name flex">
+<span>def <span class="ident">trim_lcs</span></span>(<span>lcs: dict, cut_requirement: int = 0) ‑> dict</span>
 </code></dt>
 <dd>
-<div class="desc"><p>Write datasets to a file</p>
+<div class="desc"><p>Remove epochs from a lightcurve that occur before object discovery, which
+is defined as the first mjd with SNR &gt;= 3.0.</p>
 <h2 id="args">Args</h2>
 <dl>
-<dt><strong><code>outfile</code></strong> :&ensp;<code>str</code></dt>
-<dd>filename to store datasets</dd>
-<dt><strong><code>datasets</code></strong> :&ensp;<code>dict</code></dt>
-<dd>A dict mapping dataset identifiers to the datasets</dd>
-</dl></div>
+<dt><strong><code>lcs</code></strong> :&ensp;<code>dict</code></dt>
+<dd>dictionary from a lightcurve file</dd>
+<dt><strong><code>cut_requirement</code></strong> :&ensp;<code>int</code>, default=<code>0</code></dt>
+<dd>cut number to require</dd>
+</dl>
+<h2 id="returns">Returns</h2>
+<p>copy of lcs with pre-discovery epochs removed from each lightcurve</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def save_datasets(outfile : str, datasets : dict):
+<pre><code class="python">def trim_lcs(lcs : dict, cut_requirement : int = 0) -&gt; dict :
     &#34;&#34;&#34;
-    Write datasets to a file
+    Remove epochs from a lightcurve that occur before object discovery, which
+    is defined as the first mjd with SNR &gt;= 3.0.
 
     Args:
-        outfile (str): filename to store datasets
-        datasets (dict):  A dict mapping dataset identifiers to the datasets 
+        lcs (dict): dictionary from a lightcurve file
+        cut_requirement (int, default=0): cut number to require
+
+    Returns:
+        copy of lcs with pre-discovery epochs removed from each lightcurve
     &#34;&#34;&#34;
-    np.save(outfile, datasets, allow_pickle=True)</code></pre>
+    out_lcs = {}
+    for snid, info in lcs.items():
+        
+        # Skip if the lightcurve will get cut during feature extraction
+        if not (info[&#39;cut&#39;] == -1 or info[&#39;cut&#39;] &gt; cut_requirement):
+            continue
+
+        # Get discovery MJD, skip if light curve is never discovered
+        flux = info[&#39;lightcurve&#39;][&#39;FLUXCAL&#39;].values.astype(float)
+        fluxerr = info[&#39;lightcurve&#39;][&#39;FLUXCALERR&#39;].values.astype(float)
+        detection_mask = ((flux / fluxerr) &gt;= 3.0)
+        if sum(detection_mask) == 0:
+            continue
+
+        mjds = info[&#39;lightcurve&#39;][&#39;MJD&#39;].values.astype(float)
+        mjd0 = mjds[detection_mask].min()
+
+        # Trim lightcurve
+        lc = info[&#39;lightcurve&#39;][mjds &gt;= mjd0].copy().reset_index(drop=True)
+
+        # Store results
+        out_lcs[snid] = {&#39;lightcurve&#39;: lc, &#39;cut&#39;: info[&#39;cut&#39;]}
+
+    return out_lcs</code></pre>
 </details>
 </dd>
 </dl>
 </section>
 <section>
-<h2 class="section-title" id="header-classes">Classes</h2>
-<dl>
-<dt id="knc.process.ArgumentError"><code class="flex name class">
-<span>class <span class="ident">ArgumentError</span></span>
-<span>(</span><span>*args, **kwargs)</span>
-</code></dt>
-<dd>
-<div class="desc"><p>A class to raise errors for invalid arguments</p></div>
-<details class="source">
-<summary>
-<span>Expand source code</span>
-</summary>
-<pre><code class="python">class ArgumentError(Exception):
-    &#34;&#34;&#34;
-    A class to raise errors for invalid arguments
-    &#34;&#34;&#34;
-    pass</code></pre>
-</details>
-<h3>Ancestors</h3>
-<ul class="hlist">
-<li>builtins.Exception</li>
-<li>builtins.BaseException</li>
-</ul>
-</dd>
-</dl>
 </section>
 </article>
 <nav id="sidebar">
@@ -558,16 +567,8 @@ knc.ArgumentError if results_dir cannot be found or created</p></div>
 <li><code><a title="knc.process.organize_datasets" href="#knc.process.organize_datasets">organize_datasets</a></code></li>
 <li><code><a title="knc.process.parse_args" href="#knc.process.parse_args">parse_args</a></code></li>
 <li><code><a title="knc.process.process_main" href="#knc.process.process_main">process_main</a></code></li>
-<li><code><a title="knc.process.read_lightcurves" href="#knc.process.read_lightcurves">read_lightcurves</a></code></li>
 <li><code><a title="knc.process.run_processing" href="#knc.process.run_processing">run_processing</a></code></li>
-<li><code><a title="knc.process.save_datasets" href="#knc.process.save_datasets">save_datasets</a></code></li>
-</ul>
-</li>
-<li><h3><a href="#header-classes">Classes</a></h3>
-<ul>
-<li>
-<h4><code><a title="knc.process.ArgumentError" href="#knc.process.ArgumentError">ArgumentError</a></code></h4>
-</li>
+<li><code><a title="knc.process.trim_lcs" href="#knc.process.trim_lcs">trim_lcs</a></code></li>
 </ul>
 </li>
 </ul>

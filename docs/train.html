@@ -30,6 +30,8 @@
 <pre><code class="python">&#34;&#34;&#34;
 Train a Random Forest Classifier
 &#34;&#34;&#34;
+import sys
+sys.path.append(&#39;knc&#39;)
 
 import numpy as np
 import pandas as pd
@@ -42,12 +44,7 @@ from sklearn.metrics import precision_recall_curve as pr_curve
 from sklearn.model_selection import GridSearchCV
 from sklearn.model_selection import train_test_split
 
-try:
-    from utils import sigmoid
-except ModuleNotFoundError:
-    import sys
-    sys.path.append(&#39;knc&#39;)
-    from utils import sigmoid
+from utils import sigmoid, save
 
 class Data:
     &#34;&#34;&#34;
@@ -70,8 +67,10 @@ class Data:
 
         if doit:
             self.data = self.select_feats(feats)
+            alats = [x for x in self.feats if x not in [&#39;SNID&#39;, &#39;CID&#39;, &#39;OBJ&#39;]]
             self.data = self.clean_data()
             self.prep()
+
     
 
     def select_feats(self, feats : list = []) -&gt; pd.DataFrame :
@@ -92,10 +91,11 @@ class Data:
             return self.data
         elif len(feats) != 0:
             # Overwrite self.feats if feats are passed to this function
-            self.feats = feats
+            metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
+            self.feats = [x for x in feats if x not in metadata_cols]
             
         # Check validity of features
-        intersection = set(feats).set(self.data.columns)
+        intersection = set(feats).intersection(self.data.columns)
         if len(intersection) != len(feats):
             raise ValueError(&#34;One or more features are not in the data&#34;)
 
@@ -108,18 +108,15 @@ class Data:
         Returns:
             df without rows containing infs and NaNs
         &#34;&#34;&#34;
+        # Force numeric features
+        metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
+        num_cols = [x for x in self.data.columns if x not in metadata_cols]
+        self.data[num_cols] = self.data[num_cols].apply(pd.to_numeric)
+
         # Deal with NaNs and infs
         nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
         df = self.data.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
-
-        # Force numeric features
-        metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
-        num_cols = [x for x in df.columns if x not in metadata_cols]
-        df[num_cols] = df[num_cols].apply(pd.to_numeric)
-
-        #Drop any extra large values
-        df[num_cols] = df[num_cols][~(df[num_cols] &gt; 1.e6).any(axis=1)]
-
+        
         return df.copy().reset_index(drop=True)
 
         
@@ -128,7 +125,9 @@ class Data:
         Encode and build training and testing sets
         &#34;&#34;&#34;
         # Apply one-hot encoding
-        kn_truth = [1 if x == &#39;KN&#39; else 0 for x in self.data[&#39;OBJ&#39;].values]
+        kn_truth = [1 if x == &#39;KN&#39; or x == &#39;KN-tr&#39; else 0
+                    for x in self.data[&#39;OBJ&#39;].values.astype(str)]
+        #print(sum(kn_truth), len(self.data))
         self.data[&#39;KN&#39;] = kn_truth
 
         # Make training and validation sets
@@ -146,11 +145,19 @@ class Data:
         self.X_test = X_test
         self.y_test = y_test
 
+
+
+
 class Classifier:
     &#34;&#34;&#34;
     ML algorithm for classification
     &#34;&#34;&#34;
-    def __init__(self, data : Data, doit : bool = False):
+    def __init__(self,
+                 data : Data,
+                 doit : bool = False,
+                 verbose : bool = False,
+                 skip_cv : bool = False,
+                 distribute : bool = False):
         &#34;&#34;&#34;
         Instantiate a Classifier object. If doit, the best_estimator,
         feature dict, best_params, and feature_importances attirbutes are
@@ -158,7 +165,10 @@ class Classifier:
 
         Args:
             data (Data) : A prepared instance of the Data class
-            doit (bool) : Train a classifier 
+            doit (bool) : Train a classifier
+            verbose (bool, default=False): Print status updates
+            skip_cv (bool, default=False): Skip hyperparam optimization
+            distribute (bool, default=False): Use multiprocessing
         &#34;&#34;&#34;
         self.data = data
         self.X = data.X
@@ -167,14 +177,33 @@ class Classifier:
         self.y_train = data.y_train
         self.X_test = data.X_test
         self.y_test = data.y_test
-        
-        self.rfc = RandomForestClassifier(
-            n_estimators=100, max_depth=20, random_state=6, criterion=&#39;gini&#39;)
 
+        self.n_jobs = -1 if distribute else None
+        self.rfc = RandomForestClassifier(
+            n_estimators=100, max_depth=5, random_state=6, criterion=&#39;gini&#39;,
+            n_jobs=self.n_jobs)
+
+        # Run all steps to train, optimize, and validate classifier
         if doit:
-            self.optimize_hyperparamters()
+            # Hyperparam optimization
+            if not skip_cv:
+                if verbose:
+                    print(&#34;\tOptimizing hyperparameters with grid search&#34;)
+                self.optimize_hyperparams()
+            else:
+                self.rfc.fit(self.X_train[self.data.feats], self.y_train)
+
+            # Feature selection
+            if verbose:
+                print(&#34;\tSelecting optimal features&#34;)
             self.optimize_features()
+
+            # Validation
+            if verbose:
+                print(&#34;\tValidating classifier&#34;)
             self.validate()
+
+            # Fit classifier on all data
             self.fit([], best=True)
 
     def optimize_hyperparams(self):
@@ -187,7 +216,7 @@ class Classifier:
                       &#39;class_weight&#39;: [&#39;balanced_subsample&#39;,
                                        &#39;balanced&#39;, {0: 1, 1: 1}, {0: 5, 1:5}]}
 
-        gs = GridSearchCV(rfc, param_grid, cv=5)
+        gs = GridSearchCV(self.rfc, param_grid, cv=5, n_jobs=self.n_jobs)
         gs.fit(self.data.X_train, self.data.y_train)
         self.rfc = gs.best_estimator_
         
@@ -205,9 +234,9 @@ class Classifier:
         cut = sorted_fi[np.argmax(np.gradient(sorted_fi))]
         feats = feature_names[np.where(self.rfc.feature_importances_ &gt; cut)]
         if len(feats) &gt; 0:
-            rfc_ = self.fit(feats)
+            self.fit(feats)
             feature_dict[1] = {&#39;FEATURES&#39;: feats,
-                               &#39;SCORE&#39;: rfc.score(self.X_test[feats],
+                               &#39;SCORE&#39;: self.rfc.score(self.X_test[feats],
                                                   self.y_test),
                                &#39;CUTOFF&#39;: cut}
         else:
@@ -218,12 +247,12 @@ class Classifier:
         # Method 2: use only features above a slightly lower cutoff
         cut = (sorted_fi[np.argmax(np.gradient(sorted_fi))] /
                (0.25 * len(feature_names)))
-        feats = feature_names[np.where(rfc.feature_importances_ &gt; cut)]
+        feats = feature_names[np.where(self.rfc.feature_importances_ &gt; cut)]
         if len(feats) &gt; 0:
-            rfc = self.fit(feats)
+            self.fit(feats)
             feature_dict[2] = {&#39;FEATURES&#39;: feats,
-                               &#39;SCORE&#39;: rfc.score(self.X_test[feats],
-                                                  self.y_test),
+                               &#39;SCORE&#39;: self.rfc.score(self.X_test[feats],
+                                                       self.y_test),
                                &#39;CUTOFF&#39;: cut}
         else:
             feature_dict[2] = {&#39;FEATURES&#39;: feats,
@@ -231,9 +260,9 @@ class Classifier:
                                &#39;CUTOFF&#39;: cut}
 
         # Method 3: use all features
-        rfc = self.fit(feature_names)
+        self.fit(feature_names)
         feature_dict[3] = {&#39;FEATURES&#39;: feature_names,
-                           &#39;SCORE&#39;: rfc.score(self.X_test, self.y_test),
+                           &#39;SCORE&#39;: self.rfc.score(self.X_test, self.y_test),
                            &#39;CUTOFF&#39;: 0.0}
 
         # Store results
@@ -252,39 +281,44 @@ class Classifier:
         Evaluate performance on test data and determine calibration
         &#34;&#34;&#34;
         # Predict on test data
-        rfc = self.fit(self.feats)
-        scores = rfc.predict_proba(self.X_test)
+        self.fit(self.feats)
+        scores = self.rfc.predict_proba(self.X_test[self.feats])
 
         # Calculate basic metrics
-        precision, recall, pr_thresholds = pr_curve(self.y_test[&#39;KN&#39;].values,
-                                                    scores)
+        precision, recall, pr_thresholds = pr_curve(self.y_test, scores[:,1])
         f1_score = 2 * (precision * recall) / (precision + recall)
         pr_threshold = pr_thresholds[np.argmax(f1_score)]
-        fpr, tpr, roc_thresholds = roc_curve(self.y_test[&#39;KN&#39;].values, scores)
-        auc = roc_auc_score(self.y_test[&#39;KN&#39;].values, scores)
+        fpr, tpr, roc_thresholds = roc_curve(self.y_test, scores[:,1])
+        auc = roc_auc_score(self.y_test, scores[:,1])
         
         # Determine calibration
         kn_probs, centers = [], []
         for i in range(len(roc_thresholds) - 1):
             
-            mask = ((scores &gt;= roc_thresholds[i+1]) &amp;
-                    (scores &lt; roc_thresholds[i]))
+            mask = ((scores[:,1] &gt;= roc_thresholds[i+1]) &amp;
+                    (scores[:,1] &lt; roc_thresholds[i]))
             if sum(mask) == 0:
                 continue
         
             centers.append(0.5 * (roc_thresholds[i] + roc_thresholds[i+1]))
-            num_kn = sum(self.y_test[&#39;KN&#39;].values[mask] == 1)
+            num_kn = sum(self.y_test[mask] == 1)
 
             total = sum(mask)
             kn_probs.append(num_kn / total)
+
+        try:
+            popt, pcov = curve_fit(sigmoid, centers, kn_probs)
+            self.calibration_coeffs = popt
+            self.prob_cutoff = sigmoid(pr_threshold, *popt)
+
+        except Exception:
+            self.calibration_coeffs = None
+            self.prob_cutoff = pr_threshold
             
-        popt, pcov = curve_fit(sigmoid, centers, kn_probs)
-        self.calibration_coeffs = popt
-        self.prob_cutoff = sigmoid(pr_threshold, *popt)
 
         # Store metrics
-        roc_idx = np.argmin(np.abs(roc_thresholds - threshold))
-        pr_idx = np.argmin(np.abs(pr_thresholds - threshold))
+        roc_idx = np.argmin(np.abs(roc_thresholds - pr_threshold))
+        pr_idx = np.argmin(np.abs(pr_thresholds - pr_threshold))
         self.metrics = {&#39;auc&#39;: auc,
                         &#39;fpr&#39;: fpr[roc_idx],
                         &#39;tpr&#39;: tpr[roc_idx],
@@ -306,9 +340,9 @@ class Classifier:
             a fit RFC if best == False
         &#34;&#34;&#34;
         if best:
-            self.rfc = self.rfc.fit(self.X[self.feats], self.y)
+            self.rfc.fit(self.X[self.feats], self.y)
         else:
-            return self.rfc.fit(self.X_train[feats], self.y_train)
+            self.rfc.fit(self.X_train[feats], self.y_train)
 
 
     def to_dict(self):
@@ -324,34 +358,49 @@ class Classifier:
                     &#39;calibration_coeffs&#39;: self.calibration_coeffs,
                     &#39;prob_cutoff&#39;: self.prob_cutoff,
                     &#39;feature_dict&#39;: self.feature_dict}
+        return out_dict
 
-def train_new(dataset_id : str,
+def train_new(mode : str,
+              dataset_id : str,
               key : str,
-              rfc_dir : str = &#39;classifiers/&#39;):
+              rfc_dir : str = &#39;classifiers/&#39;,
+              verbose : bool = False,
+              skip_cv : bool = False,
+              distribute : bool = False):
     &#34;&#34;&#34;
     Train a new classifier and return its key.
 
     Args:
+        mode (str): type of classifier (&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;)
         dataset_id (str): ID string for the dataset
         key (str): ID for the newly trained classifier
         rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+        verbose (bool, default=False): Print status updates
+        skip_cv (bool, default=False): Skip hyperparam optimization 
+        distribute (bool, default=False): Use multiprocessing
     &#34;&#34;&#34;
     # Load training data
-    df = pd.read_csv(f&#39;{rfc_dir}training_data.csv&#39;)
+    df = pd.read_csv(f&#39;{rfc_dir}training_data_{mode}.csv&#39;)
 
     # Determine features based on dataset ID
-    feats = [x for i, x in enumerate(df.columns) if dataset_id[i] == &#39;F&#39;] 
+    with open(f&#34;{rfc_dir}features_{mode}.txt&#34;, &#39;r&#39;) as f:
+        all_feats = [x.strip() for x in f.readlines() if x != &#39;&#39;]
+    feats = [x for i, x in enumerate(all_feats) if dataset_id[i] == &#39;F&#39;] 
 
     # Make a Data object
+    if verbose:
+        print(&#34;Preparing training data&#34;)
     training_data = Data(df, feats=feats, doit=True)
 
     # Make a classifier object
-    classifier = Classifier(data=training_data, doit=True)
+    if verbose:
+        print(&#34;Training classifier&#34;)
+    classifier = Classifier(
+        data=training_data, doit=True, verbose=verbose, skip_cv=skip_cv,
+        distribute=distribute)
         
     # Save classifier
-    np.save(f&#34;{rfc_dir}knclassifier_{key}.npy&#34;,
-            classifier.to_dict(),
-            allow_pickle=True)
+    save(f&#34;{rfc_dir}knclassifier_{mode}_{key}.npy&#34;, classifier.to_dict())
     
 
     
@@ -366,49 +415,71 @@ def train_new(dataset_id : str,
 <h2 class="section-title" id="header-functions">Functions</h2>
 <dl>
 <dt id="knc.train.train_new"><code class="name flex">
-<span>def <span class="ident">train_new</span></span>(<span>dataset_id: str, key: str, rfc_dir: str = 'classifiers/')</span>
+<span>def <span class="ident">train_new</span></span>(<span>mode: str, dataset_id: str, key: str, rfc_dir: str = 'classifiers/', verbose: bool = False, skip_cv: bool = False, distribute: bool = False)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Train a new classifier and return its key.</p>
 <h2 id="args">Args</h2>
 <dl>
+<dt><strong><code>mode</code></strong> :&ensp;<code>str</code></dt>
+<dd>type of classifier ('r', 'f', 'rfp', 'ffp')</dd>
 <dt><strong><code>dataset_id</code></strong> :&ensp;<code>str</code></dt>
 <dd>ID string for the dataset</dd>
 <dt><strong><code>key</code></strong> :&ensp;<code>str</code></dt>
 <dd>ID for the newly trained classifier</dd>
-</dl>
-<p>rfc_dir (str, default='classifiers/'): path to classifier directory</p></div>
+<dt>rfc_dir (str, default='classifiers/'): path to classifier directory</dt>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Print status updates</dd>
+<dt><strong><code>skip_cv</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Skip hyperparam optimization </dd>
+<dt><strong><code>distribute</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Use multiprocessing</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
-<pre><code class="python">def train_new(dataset_id : str,
+<pre><code class="python">def train_new(mode : str,
+              dataset_id : str,
               key : str,
-              rfc_dir : str = &#39;classifiers/&#39;):
+              rfc_dir : str = &#39;classifiers/&#39;,
+              verbose : bool = False,
+              skip_cv : bool = False,
+              distribute : bool = False):
     &#34;&#34;&#34;
     Train a new classifier and return its key.
 
     Args:
+        mode (str): type of classifier (&#39;r&#39;, &#39;f&#39;, &#39;rfp&#39;, &#39;ffp&#39;)
         dataset_id (str): ID string for the dataset
         key (str): ID for the newly trained classifier
         rfc_dir (str, default=&#39;classifiers/&#39;): path to classifier directory
+        verbose (bool, default=False): Print status updates
+        skip_cv (bool, default=False): Skip hyperparam optimization 
+        distribute (bool, default=False): Use multiprocessing
     &#34;&#34;&#34;
     # Load training data
-    df = pd.read_csv(f&#39;{rfc_dir}training_data.csv&#39;)
+    df = pd.read_csv(f&#39;{rfc_dir}training_data_{mode}.csv&#39;)
 
     # Determine features based on dataset ID
-    feats = [x for i, x in enumerate(df.columns) if dataset_id[i] == &#39;F&#39;] 
+    with open(f&#34;{rfc_dir}features_{mode}.txt&#34;, &#39;r&#39;) as f:
+        all_feats = [x.strip() for x in f.readlines() if x != &#39;&#39;]
+    feats = [x for i, x in enumerate(all_feats) if dataset_id[i] == &#39;F&#39;] 
 
     # Make a Data object
+    if verbose:
+        print(&#34;Preparing training data&#34;)
     training_data = Data(df, feats=feats, doit=True)
 
     # Make a classifier object
-    classifier = Classifier(data=training_data, doit=True)
+    if verbose:
+        print(&#34;Training classifier&#34;)
+    classifier = Classifier(
+        data=training_data, doit=True, verbose=verbose, skip_cv=skip_cv,
+        distribute=distribute)
         
     # Save classifier
-    np.save(f&#34;{rfc_dir}knclassifier_{key}.npy&#34;,
-            classifier.to_dict(),
-            allow_pickle=True)</code></pre>
+    save(f&#34;{rfc_dir}knclassifier_{mode}_{key}.npy&#34;, classifier.to_dict())</code></pre>
 </details>
 </dd>
 </dl>
@@ -418,7 +489,7 @@ def train_new(dataset_id : str,
 <dl>
 <dt id="knc.train.Classifier"><code class="flex name class">
 <span>class <span class="ident">Classifier</span></span>
-<span>(</span><span>data: <a title="knc.train.Data" href="#knc.train.Data">Data</a>, doit: bool = False)</span>
+<span>(</span><span>data: <a title="knc.train.Data" href="#knc.train.Data">Data</a>, doit: bool = False, verbose: bool = False, skip_cv: bool = False, distribute: bool = False)</span>
 </code></dt>
 <dd>
 <div class="desc"><p>ML algorithm for classification</p>
@@ -426,8 +497,16 @@ def train_new(dataset_id : str,
 feature dict, best_params, and feature_importances attirbutes are
 calculated</p>
 <h2 id="args">Args</h2>
-<p>data (Data) : A prepared instance of the Data class
-doit (bool) : Train a classifier</p></div>
+<dl>
+<dt>data (Data) : A prepared instance of the Data class</dt>
+<dt>doit (bool) : Train a classifier</dt>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Print status updates</dd>
+<dt><strong><code>skip_cv</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Skip hyperparam optimization</dd>
+<dt><strong><code>distribute</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>Use multiprocessing</dd>
+</dl></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
@@ -436,7 +515,12 @@ doit (bool) : Train a classifier</p></div>
     &#34;&#34;&#34;
     ML algorithm for classification
     &#34;&#34;&#34;
-    def __init__(self, data : Data, doit : bool = False):
+    def __init__(self,
+                 data : Data,
+                 doit : bool = False,
+                 verbose : bool = False,
+                 skip_cv : bool = False,
+                 distribute : bool = False):
         &#34;&#34;&#34;
         Instantiate a Classifier object. If doit, the best_estimator,
         feature dict, best_params, and feature_importances attirbutes are
@@ -444,7 +528,10 @@ doit (bool) : Train a classifier</p></div>
 
         Args:
             data (Data) : A prepared instance of the Data class
-            doit (bool) : Train a classifier 
+            doit (bool) : Train a classifier
+            verbose (bool, default=False): Print status updates
+            skip_cv (bool, default=False): Skip hyperparam optimization
+            distribute (bool, default=False): Use multiprocessing
         &#34;&#34;&#34;
         self.data = data
         self.X = data.X
@@ -453,14 +540,33 @@ doit (bool) : Train a classifier</p></div>
         self.y_train = data.y_train
         self.X_test = data.X_test
         self.y_test = data.y_test
-        
-        self.rfc = RandomForestClassifier(
-            n_estimators=100, max_depth=20, random_state=6, criterion=&#39;gini&#39;)
 
+        self.n_jobs = -1 if distribute else None
+        self.rfc = RandomForestClassifier(
+            n_estimators=100, max_depth=5, random_state=6, criterion=&#39;gini&#39;,
+            n_jobs=self.n_jobs)
+
+        # Run all steps to train, optimize, and validate classifier
         if doit:
-            self.optimize_hyperparamters()
+            # Hyperparam optimization
+            if not skip_cv:
+                if verbose:
+                    print(&#34;\tOptimizing hyperparameters with grid search&#34;)
+                self.optimize_hyperparams()
+            else:
+                self.rfc.fit(self.X_train[self.data.feats], self.y_train)
+
+            # Feature selection
+            if verbose:
+                print(&#34;\tSelecting optimal features&#34;)
             self.optimize_features()
+
+            # Validation
+            if verbose:
+                print(&#34;\tValidating classifier&#34;)
             self.validate()
+
+            # Fit classifier on all data
             self.fit([], best=True)
 
     def optimize_hyperparams(self):
@@ -473,7 +579,7 @@ doit (bool) : Train a classifier</p></div>
                       &#39;class_weight&#39;: [&#39;balanced_subsample&#39;,
                                        &#39;balanced&#39;, {0: 1, 1: 1}, {0: 5, 1:5}]}
 
-        gs = GridSearchCV(rfc, param_grid, cv=5)
+        gs = GridSearchCV(self.rfc, param_grid, cv=5, n_jobs=self.n_jobs)
         gs.fit(self.data.X_train, self.data.y_train)
         self.rfc = gs.best_estimator_
         
@@ -491,9 +597,9 @@ doit (bool) : Train a classifier</p></div>
         cut = sorted_fi[np.argmax(np.gradient(sorted_fi))]
         feats = feature_names[np.where(self.rfc.feature_importances_ &gt; cut)]
         if len(feats) &gt; 0:
-            rfc_ = self.fit(feats)
+            self.fit(feats)
             feature_dict[1] = {&#39;FEATURES&#39;: feats,
-                               &#39;SCORE&#39;: rfc.score(self.X_test[feats],
+                               &#39;SCORE&#39;: self.rfc.score(self.X_test[feats],
                                                   self.y_test),
                                &#39;CUTOFF&#39;: cut}
         else:
@@ -504,12 +610,12 @@ doit (bool) : Train a classifier</p></div>
         # Method 2: use only features above a slightly lower cutoff
         cut = (sorted_fi[np.argmax(np.gradient(sorted_fi))] /
                (0.25 * len(feature_names)))
-        feats = feature_names[np.where(rfc.feature_importances_ &gt; cut)]
+        feats = feature_names[np.where(self.rfc.feature_importances_ &gt; cut)]
         if len(feats) &gt; 0:
-            rfc = self.fit(feats)
+            self.fit(feats)
             feature_dict[2] = {&#39;FEATURES&#39;: feats,
-                               &#39;SCORE&#39;: rfc.score(self.X_test[feats],
-                                                  self.y_test),
+                               &#39;SCORE&#39;: self.rfc.score(self.X_test[feats],
+                                                       self.y_test),
                                &#39;CUTOFF&#39;: cut}
         else:
             feature_dict[2] = {&#39;FEATURES&#39;: feats,
@@ -517,9 +623,9 @@ doit (bool) : Train a classifier</p></div>
                                &#39;CUTOFF&#39;: cut}
 
         # Method 3: use all features
-        rfc = self.fit(feature_names)
+        self.fit(feature_names)
         feature_dict[3] = {&#39;FEATURES&#39;: feature_names,
-                           &#39;SCORE&#39;: rfc.score(self.X_test, self.y_test),
+                           &#39;SCORE&#39;: self.rfc.score(self.X_test, self.y_test),
                            &#39;CUTOFF&#39;: 0.0}
 
         # Store results
@@ -538,39 +644,44 @@ doit (bool) : Train a classifier</p></div>
         Evaluate performance on test data and determine calibration
         &#34;&#34;&#34;
         # Predict on test data
-        rfc = self.fit(self.feats)
-        scores = rfc.predict_proba(self.X_test)
+        self.fit(self.feats)
+        scores = self.rfc.predict_proba(self.X_test[self.feats])
 
         # Calculate basic metrics
-        precision, recall, pr_thresholds = pr_curve(self.y_test[&#39;KN&#39;].values,
-                                                    scores)
+        precision, recall, pr_thresholds = pr_curve(self.y_test, scores[:,1])
         f1_score = 2 * (precision * recall) / (precision + recall)
         pr_threshold = pr_thresholds[np.argmax(f1_score)]
-        fpr, tpr, roc_thresholds = roc_curve(self.y_test[&#39;KN&#39;].values, scores)
-        auc = roc_auc_score(self.y_test[&#39;KN&#39;].values, scores)
+        fpr, tpr, roc_thresholds = roc_curve(self.y_test, scores[:,1])
+        auc = roc_auc_score(self.y_test, scores[:,1])
         
         # Determine calibration
         kn_probs, centers = [], []
         for i in range(len(roc_thresholds) - 1):
             
-            mask = ((scores &gt;= roc_thresholds[i+1]) &amp;
-                    (scores &lt; roc_thresholds[i]))
+            mask = ((scores[:,1] &gt;= roc_thresholds[i+1]) &amp;
+                    (scores[:,1] &lt; roc_thresholds[i]))
             if sum(mask) == 0:
                 continue
         
             centers.append(0.5 * (roc_thresholds[i] + roc_thresholds[i+1]))
-            num_kn = sum(self.y_test[&#39;KN&#39;].values[mask] == 1)
+            num_kn = sum(self.y_test[mask] == 1)
 
             total = sum(mask)
             kn_probs.append(num_kn / total)
+
+        try:
+            popt, pcov = curve_fit(sigmoid, centers, kn_probs)
+            self.calibration_coeffs = popt
+            self.prob_cutoff = sigmoid(pr_threshold, *popt)
+
+        except Exception:
+            self.calibration_coeffs = None
+            self.prob_cutoff = pr_threshold
             
-        popt, pcov = curve_fit(sigmoid, centers, kn_probs)
-        self.calibration_coeffs = popt
-        self.prob_cutoff = sigmoid(pr_threshold, *popt)
 
         # Store metrics
-        roc_idx = np.argmin(np.abs(roc_thresholds - threshold))
-        pr_idx = np.argmin(np.abs(pr_thresholds - threshold))
+        roc_idx = np.argmin(np.abs(roc_thresholds - pr_threshold))
+        pr_idx = np.argmin(np.abs(pr_thresholds - pr_threshold))
         self.metrics = {&#39;auc&#39;: auc,
                         &#39;fpr&#39;: fpr[roc_idx],
                         &#39;tpr&#39;: tpr[roc_idx],
@@ -592,9 +703,9 @@ doit (bool) : Train a classifier</p></div>
             a fit RFC if best == False
         &#34;&#34;&#34;
         if best:
-            self.rfc = self.rfc.fit(self.X[self.feats], self.y)
+            self.rfc.fit(self.X[self.feats], self.y)
         else:
-            return self.rfc.fit(self.X_train[feats], self.y_train)
+            self.rfc.fit(self.X_train[feats], self.y_train)
 
 
     def to_dict(self):
@@ -609,7 +720,8 @@ doit (bool) : Train a classifier</p></div>
                     &#39;feats&#39;: self.feats,
                     &#39;calibration_coeffs&#39;: self.calibration_coeffs,
                     &#39;prob_cutoff&#39;: self.prob_cutoff,
-                    &#39;feature_dict&#39;: self.feature_dict}</code></pre>
+                    &#39;feature_dict&#39;: self.feature_dict}
+        return out_dict</code></pre>
 </details>
 <h3>Methods</h3>
 <dl>
@@ -643,9 +755,9 @@ doit (bool) : Train a classifier</p></div>
         a fit RFC if best == False
     &#34;&#34;&#34;
     if best:
-        self.rfc = self.rfc.fit(self.X[self.feats], self.y)
+        self.rfc.fit(self.X[self.feats], self.y)
     else:
-        return self.rfc.fit(self.X_train[feats], self.y_train)</code></pre>
+        self.rfc.fit(self.X_train[feats], self.y_train)</code></pre>
 </details>
 </dd>
 <dt id="knc.train.Classifier.optimize_features"><code class="name flex">
@@ -670,9 +782,9 @@ doit (bool) : Train a classifier</p></div>
     cut = sorted_fi[np.argmax(np.gradient(sorted_fi))]
     feats = feature_names[np.where(self.rfc.feature_importances_ &gt; cut)]
     if len(feats) &gt; 0:
-        rfc_ = self.fit(feats)
+        self.fit(feats)
         feature_dict[1] = {&#39;FEATURES&#39;: feats,
-                           &#39;SCORE&#39;: rfc.score(self.X_test[feats],
+                           &#39;SCORE&#39;: self.rfc.score(self.X_test[feats],
                                               self.y_test),
                            &#39;CUTOFF&#39;: cut}
     else:
@@ -683,12 +795,12 @@ doit (bool) : Train a classifier</p></div>
     # Method 2: use only features above a slightly lower cutoff
     cut = (sorted_fi[np.argmax(np.gradient(sorted_fi))] /
            (0.25 * len(feature_names)))
-    feats = feature_names[np.where(rfc.feature_importances_ &gt; cut)]
+    feats = feature_names[np.where(self.rfc.feature_importances_ &gt; cut)]
     if len(feats) &gt; 0:
-        rfc = self.fit(feats)
+        self.fit(feats)
         feature_dict[2] = {&#39;FEATURES&#39;: feats,
-                           &#39;SCORE&#39;: rfc.score(self.X_test[feats],
-                                              self.y_test),
+                           &#39;SCORE&#39;: self.rfc.score(self.X_test[feats],
+                                                   self.y_test),
                            &#39;CUTOFF&#39;: cut}
     else:
         feature_dict[2] = {&#39;FEATURES&#39;: feats,
@@ -696,9 +808,9 @@ doit (bool) : Train a classifier</p></div>
                            &#39;CUTOFF&#39;: cut}
 
     # Method 3: use all features
-    rfc = self.fit(feature_names)
+    self.fit(feature_names)
     feature_dict[3] = {&#39;FEATURES&#39;: feature_names,
-                       &#39;SCORE&#39;: rfc.score(self.X_test, self.y_test),
+                       &#39;SCORE&#39;: self.rfc.score(self.X_test, self.y_test),
                        &#39;CUTOFF&#39;: 0.0}
 
     # Store results
@@ -731,7 +843,7 @@ doit (bool) : Train a classifier</p></div>
                   &#39;class_weight&#39;: [&#39;balanced_subsample&#39;,
                                    &#39;balanced&#39;, {0: 1, 1: 1}, {0: 5, 1:5}]}
 
-    gs = GridSearchCV(rfc, param_grid, cv=5)
+    gs = GridSearchCV(self.rfc, param_grid, cv=5, n_jobs=self.n_jobs)
     gs.fit(self.data.X_train, self.data.y_train)
     self.rfc = gs.best_estimator_</code></pre>
 </details>
@@ -759,7 +871,8 @@ doit (bool) : Train a classifier</p></div>
                 &#39;feats&#39;: self.feats,
                 &#39;calibration_coeffs&#39;: self.calibration_coeffs,
                 &#39;prob_cutoff&#39;: self.prob_cutoff,
-                &#39;feature_dict&#39;: self.feature_dict}</code></pre>
+                &#39;feature_dict&#39;: self.feature_dict}
+    return out_dict</code></pre>
 </details>
 </dd>
 <dt id="knc.train.Classifier.validate"><code class="name flex">
@@ -776,39 +889,44 @@ doit (bool) : Train a classifier</p></div>
     Evaluate performance on test data and determine calibration
     &#34;&#34;&#34;
     # Predict on test data
-    rfc = self.fit(self.feats)
-    scores = rfc.predict_proba(self.X_test)
+    self.fit(self.feats)
+    scores = self.rfc.predict_proba(self.X_test[self.feats])
 
     # Calculate basic metrics
-    precision, recall, pr_thresholds = pr_curve(self.y_test[&#39;KN&#39;].values,
-                                                scores)
+    precision, recall, pr_thresholds = pr_curve(self.y_test, scores[:,1])
     f1_score = 2 * (precision * recall) / (precision + recall)
     pr_threshold = pr_thresholds[np.argmax(f1_score)]
-    fpr, tpr, roc_thresholds = roc_curve(self.y_test[&#39;KN&#39;].values, scores)
-    auc = roc_auc_score(self.y_test[&#39;KN&#39;].values, scores)
+    fpr, tpr, roc_thresholds = roc_curve(self.y_test, scores[:,1])
+    auc = roc_auc_score(self.y_test, scores[:,1])
     
     # Determine calibration
     kn_probs, centers = [], []
     for i in range(len(roc_thresholds) - 1):
         
-        mask = ((scores &gt;= roc_thresholds[i+1]) &amp;
-                (scores &lt; roc_thresholds[i]))
+        mask = ((scores[:,1] &gt;= roc_thresholds[i+1]) &amp;
+                (scores[:,1] &lt; roc_thresholds[i]))
         if sum(mask) == 0:
             continue
     
         centers.append(0.5 * (roc_thresholds[i] + roc_thresholds[i+1]))
-        num_kn = sum(self.y_test[&#39;KN&#39;].values[mask] == 1)
+        num_kn = sum(self.y_test[mask] == 1)
 
         total = sum(mask)
         kn_probs.append(num_kn / total)
+
+    try:
+        popt, pcov = curve_fit(sigmoid, centers, kn_probs)
+        self.calibration_coeffs = popt
+        self.prob_cutoff = sigmoid(pr_threshold, *popt)
+
+    except Exception:
+        self.calibration_coeffs = None
+        self.prob_cutoff = pr_threshold
         
-    popt, pcov = curve_fit(sigmoid, centers, kn_probs)
-    self.calibration_coeffs = popt
-    self.prob_cutoff = sigmoid(pr_threshold, *popt)
 
     # Store metrics
-    roc_idx = np.argmin(np.abs(roc_thresholds - threshold))
-    pr_idx = np.argmin(np.abs(pr_thresholds - threshold))
+    roc_idx = np.argmin(np.abs(roc_thresholds - pr_threshold))
+    pr_idx = np.argmin(np.abs(pr_thresholds - pr_threshold))
     self.metrics = {&#39;auc&#39;: auc,
                     &#39;fpr&#39;: fpr[roc_idx],
                     &#39;tpr&#39;: tpr[roc_idx],
@@ -862,8 +980,10 @@ attributes are calculated</p>
 
         if doit:
             self.data = self.select_feats(feats)
+            alats = [x for x in self.feats if x not in [&#39;SNID&#39;, &#39;CID&#39;, &#39;OBJ&#39;]]
             self.data = self.clean_data()
             self.prep()
+
     
 
     def select_feats(self, feats : list = []) -&gt; pd.DataFrame :
@@ -884,10 +1004,11 @@ attributes are calculated</p>
             return self.data
         elif len(feats) != 0:
             # Overwrite self.feats if feats are passed to this function
-            self.feats = feats
+            metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
+            self.feats = [x for x in feats if x not in metadata_cols]
             
         # Check validity of features
-        intersection = set(feats).set(self.data.columns)
+        intersection = set(feats).intersection(self.data.columns)
         if len(intersection) != len(feats):
             raise ValueError(&#34;One or more features are not in the data&#34;)
 
@@ -900,18 +1021,15 @@ attributes are calculated</p>
         Returns:
             df without rows containing infs and NaNs
         &#34;&#34;&#34;
+        # Force numeric features
+        metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
+        num_cols = [x for x in self.data.columns if x not in metadata_cols]
+        self.data[num_cols] = self.data[num_cols].apply(pd.to_numeric)
+
         # Deal with NaNs and infs
         nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
         df = self.data.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
-
-        # Force numeric features
-        metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
-        num_cols = [x for x in df.columns if x not in metadata_cols]
-        df[num_cols] = df[num_cols].apply(pd.to_numeric)
-
-        #Drop any extra large values
-        df[num_cols] = df[num_cols][~(df[num_cols] &gt; 1.e6).any(axis=1)]
-
+        
         return df.copy().reset_index(drop=True)
 
         
@@ -920,7 +1038,9 @@ attributes are calculated</p>
         Encode and build training and testing sets
         &#34;&#34;&#34;
         # Apply one-hot encoding
-        kn_truth = [1 if x == &#39;KN&#39; else 0 for x in self.data[&#39;OBJ&#39;].values]
+        kn_truth = [1 if x == &#39;KN&#39; or x == &#39;KN-tr&#39; else 0
+                    for x in self.data[&#39;OBJ&#39;].values.astype(str)]
+        #print(sum(kn_truth), len(self.data))
         self.data[&#39;KN&#39;] = kn_truth
 
         # Make training and validation sets
@@ -958,18 +1078,15 @@ attributes are calculated</p>
     Returns:
         df without rows containing infs and NaNs
     &#34;&#34;&#34;
+    # Force numeric features
+    metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
+    num_cols = [x for x in self.data.columns if x not in metadata_cols]
+    self.data[num_cols] = self.data[num_cols].apply(pd.to_numeric)
+
     # Deal with NaNs and infs
     nas = [np.inf, -np.inf, &#39;inf&#39;, &#39;nan&#39;, &#39;NaN&#39;]
     df = self.data.replace(nas, np.nan).dropna(axis=0, how=&#39;any&#39;)
-
-    # Force numeric features
-    metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
-    num_cols = [x for x in df.columns if x not in metadata_cols]
-    df[num_cols] = df[num_cols].apply(pd.to_numeric)
-
-    #Drop any extra large values
-    df[num_cols] = df[num_cols][~(df[num_cols] &gt; 1.e6).any(axis=1)]
-
+    
     return df.copy().reset_index(drop=True)</code></pre>
 </details>
 </dd>
@@ -987,7 +1104,9 @@ attributes are calculated</p>
     Encode and build training and testing sets
     &#34;&#34;&#34;
     # Apply one-hot encoding
-    kn_truth = [1 if x == &#39;KN&#39; else 0 for x in self.data[&#39;OBJ&#39;].values]
+    kn_truth = [1 if x == &#39;KN&#39; or x == &#39;KN-tr&#39; else 0
+                for x in self.data[&#39;OBJ&#39;].values.astype(str)]
+    #print(sum(kn_truth), len(self.data))
     self.data[&#39;KN&#39;] = kn_truth
 
     # Make training and validation sets
@@ -1042,10 +1161,11 @@ attributes are calculated</p>
         return self.data
     elif len(feats) != 0:
         # Overwrite self.feats if feats are passed to this function
-        self.feats = feats
+        metadata_cols = [&#39;OBJ&#39;, &#39;SNID&#39;]
+        self.feats = [x for x in feats if x not in metadata_cols]
         
     # Check validity of features
-    intersection = set(feats).set(self.data.columns)
+    intersection = set(feats).intersection(self.data.columns)
     if len(intersection) != len(feats):
         raise ValueError(&#34;One or more features are not in the data&#34;)
 

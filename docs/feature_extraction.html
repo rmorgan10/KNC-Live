@@ -31,6 +31,9 @@
 Extract features from lightcurves
 &#34;&#34;&#34;
 
+import sys
+sys.path.append(&#39;knc&#39;)
+
 import pandas as pd
 
 from features import FeatureExtractor
@@ -77,8 +80,11 @@ def extract(lc : pd.DataFrame,
     return data_dict
 
 def extract_all(lcs : dict,
-                cut_requirement: int = 0,
-                obj : str = &#39;DATA&#39;) -&gt; pd.DataFrame:
+                cut_requirement : int = 0,
+                obj : str = &#39;DATA&#39;,
+                return_feats : bool = False,
+                sample : int = None,
+                verbose : bool = False) -&gt; pd.DataFrame:
     &#34;&#34;&#34;
     Extract features from all lightcurves in a dictionary
 
@@ -86,27 +92,51 @@ def extract_all(lcs : dict,
         lcs (dict): dict of all lightcurves
         cut_requirement (int, default=0): number of cut to enforce
         obj (str, default=&#39;DATA&#39;) : label to give to object
-    
+        return_feats (bool, default=False) : return list of all features 
+        sample (int, default=None): max number of lightcurves to use
+        verbose (bool, default=False): print progress
+
     Returns:
-        pandas DataFrame of all extracted features
+        pandas DataFrame of all extracted features,
+        list of all features if return_feats=True
     &#34;&#34;&#34;
     extractor = FeatureExtractor()
 
     # Extract features for everything at the desired cut level
     data = []
-    for snid, info in cut_res.items():
+    count = 0
+    sample = len(lcs) if sample is None else sample
+
+    for snid, info in lcs.items():
         if info[&#39;cut&#39;] &gt; cut_requirement or info[&#39;cut&#39;] == -1:
             flts = set(info[&#39;lightcurve&#39;][&#39;FLT&#39;].values)
-            data_dict = extract(info[&#39;lightcurve&#39;], flts, extractor)
+            data_dict = extract(info[&#39;lightcurve&#39;], extractor)
             data_dict[&#39;SNID&#39;] = snid
             data_dict[&#39;OBJ&#39;] = obj
             data.append(data_dict)
 
+            count += 1
+            if count &gt;= sample:
+                break
+
+        if verbose and count % 50 == 0:
+            progress = str(round(count / sample * 100.0, 2))
+            sys.stdout.write(f&#34;Progress: {progress} %    \r&#34;)
+            sys.stdout.flush()
+            
     # Construct and clean a DataFrame
+    
     df = pd.DataFrame(data)
+    feats = df.columns
     df = df.dropna(how=&#39;all&#39;)
     df = df.fillna(&#39;N&#39;)
 
+    if verbose:
+        print(&#34;&#34;)
+
+    if return_feats:
+        return df, feats
+    
     return df</code></pre>
 </details>
 </section>
@@ -178,7 +208,7 @@ def extract_all(lcs : dict,
 </details>
 </dd>
 <dt id="knc.feature_extraction.extract_all"><code class="name flex">
-<span>def <span class="ident">extract_all</span></span>(<span>lcs: dict, cut_requirement: int = 0, obj: str = 'DATA') ‑> pandas.core.frame.DataFrame</span>
+<span>def <span class="ident">extract_all</span></span>(<span>lcs: dict, cut_requirement: int = 0, obj: str = 'DATA', return_feats: bool = False, sample: int = None, verbose: bool = False) ‑> pandas.core.frame.DataFrame</span>
 </code></dt>
 <dd>
 <div class="desc"><p>Extract features from all lightcurves in a dictionary</p>
@@ -188,17 +218,26 @@ def extract_all(lcs : dict,
 <dd>dict of all lightcurves</dd>
 <dt><strong><code>cut_requirement</code></strong> :&ensp;<code>int</code>, default=<code>0</code></dt>
 <dd>number of cut to enforce</dd>
+<dt>obj (str, default='DATA') : label to give to object</dt>
+<dt>return_feats (bool, default=False) : return list of all features</dt>
+<dt><strong><code>sample</code></strong> :&ensp;<code>int</code>, default=<code>None</code></dt>
+<dd>max number of lightcurves to use</dd>
+<dt><strong><code>verbose</code></strong> :&ensp;<code>bool</code>, default=<code>False</code></dt>
+<dd>print progress</dd>
 </dl>
-<p>obj (str, default='DATA') : label to give to object</p>
 <h2 id="returns">Returns</h2>
-<p>pandas DataFrame of all extracted features</p></div>
+<p>pandas DataFrame of all extracted features,
+list of all features if return_feats=True</p></div>
 <details class="source">
 <summary>
 <span>Expand source code</span>
 </summary>
 <pre><code class="python">def extract_all(lcs : dict,
-                cut_requirement: int = 0,
-                obj : str = &#39;DATA&#39;) -&gt; pd.DataFrame:
+                cut_requirement : int = 0,
+                obj : str = &#39;DATA&#39;,
+                return_feats : bool = False,
+                sample : int = None,
+                verbose : bool = False) -&gt; pd.DataFrame:
     &#34;&#34;&#34;
     Extract features from all lightcurves in a dictionary
 
@@ -206,27 +245,51 @@ def extract_all(lcs : dict,
         lcs (dict): dict of all lightcurves
         cut_requirement (int, default=0): number of cut to enforce
         obj (str, default=&#39;DATA&#39;) : label to give to object
-    
+        return_feats (bool, default=False) : return list of all features 
+        sample (int, default=None): max number of lightcurves to use
+        verbose (bool, default=False): print progress
+
     Returns:
-        pandas DataFrame of all extracted features
+        pandas DataFrame of all extracted features,
+        list of all features if return_feats=True
     &#34;&#34;&#34;
     extractor = FeatureExtractor()
 
     # Extract features for everything at the desired cut level
     data = []
-    for snid, info in cut_res.items():
+    count = 0
+    sample = len(lcs) if sample is None else sample
+
+    for snid, info in lcs.items():
         if info[&#39;cut&#39;] &gt; cut_requirement or info[&#39;cut&#39;] == -1:
             flts = set(info[&#39;lightcurve&#39;][&#39;FLT&#39;].values)
-            data_dict = extract(info[&#39;lightcurve&#39;], flts, extractor)
+            data_dict = extract(info[&#39;lightcurve&#39;], extractor)
             data_dict[&#39;SNID&#39;] = snid
             data_dict[&#39;OBJ&#39;] = obj
             data.append(data_dict)
 
+            count += 1
+            if count &gt;= sample:
+                break
+
+        if verbose and count % 50 == 0:
+            progress = str(round(count / sample * 100.0, 2))
+            sys.stdout.write(f&#34;Progress: {progress} %    \r&#34;)
+            sys.stdout.flush()
+            
     # Construct and clean a DataFrame
+    
     df = pd.DataFrame(data)
+    feats = df.columns
     df = df.dropna(how=&#39;all&#39;)
     df = df.fillna(&#39;N&#39;)
 
+    if verbose:
+        print(&#34;&#34;)
+
+    if return_feats:
+        return df, feats
+    
     return df</code></pre>
 </details>
 </dd>
