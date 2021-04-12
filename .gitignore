@@ -6,3 +6,4 @@ KNC_Live.egg-info/
 build/
 dist/
 *egg-info/
+testing_data/my_tests
