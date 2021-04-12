@@ -38,8 +38,10 @@ class Data:
 
         if doit:
             self.data = self.select_feats(feats)
+            alats = [x for x in self.feats if x not in ['SNID', 'CID', 'OBJ']]
             self.data = self.clean_data()
             self.prep()
+
     
 
     def select_feats(self, feats : list = []) -> pd.DataFrame :
@@ -77,18 +79,15 @@ class Data:
         Returns:
             df without rows containing infs and NaNs
         """
+        # Force numeric features
+        metadata_cols = ['OBJ', 'SNID']
+        num_cols = [x for x in self.data.columns if x not in metadata_cols]
+        self.data[num_cols] = self.data[num_cols].apply(pd.to_numeric)
+
         # Deal with NaNs and infs
         nas = [np.inf, -np.inf, 'inf', 'nan', 'NaN']
         df = self.data.replace(nas, np.nan).dropna(axis=0, how='any')
-
-        # Force numeric features
-        metadata_cols = ['OBJ', 'SNID']
-        num_cols = [x for x in df.columns if x not in metadata_cols]
-        df[num_cols] = df[num_cols].apply(pd.to_numeric)
-
-        #Drop any extra large values
-        df[num_cols] = df[num_cols][~(df[num_cols] > 1.e6).any(axis=1)]
-
+        
         return df.copy().reset_index(drop=True)
 
         
@@ -99,7 +98,7 @@ class Data:
         # Apply one-hot encoding
         kn_truth = [1 if x == 'KN' or x == 'KN-tr' else 0
                     for x in self.data['OBJ'].values.astype(str)]
-        print(sum(kn_truth), len(self.data))
+        #print(sum(kn_truth), len(self.data))
         self.data['KN'] = kn_truth
 
         # Make training and validation sets
@@ -117,6 +116,9 @@ class Data:
         self.X_test = X_test
         self.y_test = y_test
 
+
+
+
 class Classifier:
     """
     ML algorithm for classification
@@ -124,7 +126,8 @@ class Classifier:
     def __init__(self,
                  data : Data,
                  doit : bool = False,
-                 verbose : bool = False):
+                 verbose : bool = False,
+                 skip_cv : bool = False):
         """
         Instantiate a Classifier object. If doit, the best_estimator,
         feature dict, best_params, and feature_importances attirbutes are
@@ -134,6 +137,7 @@ class Classifier:
             data (Data) : A prepared instance of the Data class
             doit (bool) : Train a classifier
             verbose (bool, default=False): Print status updates
+            skip_cv (bool, default=False): Skip hyperparam optimization
         """
         self.data = data
         self.X = data.X
@@ -144,18 +148,29 @@ class Classifier:
         self.y_test = data.y_test
         
         self.rfc = RandomForestClassifier(
-            n_estimators=100, max_depth=20, random_state=6, criterion='gini')
+            n_estimators=100, max_depth=5, random_state=6, criterion='gini')
 
+        # Run all steps to train, optimize, and validate classifier
         if doit:
-            if verbose:
-                print("\tOptimizing hyperparameters with grid search")
-            self.optimize_hyperparams()
+            # Hyperparam optimization
+            if not skip_cv:
+                if verbose:
+                    print("\tOptimizing hyperparameters with grid search")
+                self.optimize_hyperparams()
+            else:
+                self.rfc.fit(self.X_train[self.data.feats], self.y_train)
+
+            # Feature selection
             if verbose:
                 print("\tSelecting optimal features")
             self.optimize_features()
+
+            # Validation
             if verbose:
                 print("\tValidating classifier")
             self.validate()
+
+            # Fit classifier on all data
             self.fit([], best=True)
 
     def optimize_hyperparams(self):
@@ -316,7 +331,8 @@ def train_new(mode : str,
               dataset_id : str,
               key : str,
               rfc_dir : str = 'classifiers/',
-              verbose : bool = False):
+              verbose : bool = False,
+              skip_cv : bool = False):
     """
     Train a new classifier and return its key.
 
@@ -326,6 +342,7 @@ def train_new(mode : str,
         key (str): ID for the newly trained classifier
         rfc_dir (str, default='classifiers/'): path to classifier directory
         verbose (bool, default=False): Print status updates
+        skip_cv (bool, default=False): Skip hyperparam optimization 
     """
     # Load training data
     df = pd.read_csv(f'{rfc_dir}training_data_{mode}.csv')
@@ -343,7 +360,8 @@ def train_new(mode : str,
     # Make a classifier object
     if verbose:
         print("Training classifier")
-    classifier = Classifier(data=training_data, doit=True, verbose=verbose)
+    classifier = Classifier(
+        data=training_data, doit=True, verbose=verbose, skip_cv=skip_cv)
         
     # Save classifier
     save(f"{rfc_dir}knclassifier_{mode}_{key}.npy", classifier.to_dict())

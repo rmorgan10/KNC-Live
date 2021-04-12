@@ -58,7 +58,8 @@ def get_classifier_filename(mode : str,
                             dataset_id : str,
                             id_map_file : str = 'id_map.npy',
                             rfc_dir : str = 'classifiers/',
-                            verbose : bool = False) -> str:
+                            verbose : bool = False,
+                            skip_cv : bool = False) -> str:
     """
     Given a classifier ID, return the filepath to the classifier. Trains
     a new classifier if no classifiers match the ID.
@@ -69,6 +70,7 @@ def get_classifier_filename(mode : str,
         id_map_file (str, default='id_map.npy'): path to map of classifier ids
         rfc_dir (str, default='classifiers/'): path to classifier directory
         verbose (bool, default=False): Print status updates
+        skip_cv (bool, default=False): Skip hyperparam optimization
 
     Returns:
         filename of the classifier
@@ -86,7 +88,7 @@ def get_classifier_filename(mode : str,
         id_map = {dataset_id : key}
         if verbose:
             print("No classifier found, training new classifier")
-        train.train_new(mode, dataset_id, key, rfc_dir, verbose)
+        train.train_new(mode, dataset_id, key, rfc_dir, verbose, skip_cv)
         
     except KeyError:
         if verbose:
@@ -106,7 +108,8 @@ def classify_datasets(mode : str,
                       data_dict : dict,
                       id_map_file : str = 'id_map.npy',
                       rfc_dir : str = 'classifiers/',
-                      verbose : bool = False) -> pd.DataFrame :
+                      verbose : bool = False,
+                      skip_cv : bool = False) -> pd.DataFrame :
     """
     For each dataset, load the corresponding classifier and predict
 
@@ -116,6 +119,7 @@ def classify_datasets(mode : str,
         id_map_file (str, default='id_map.npy'): path to map of classifier ids
         rfc_dir (str, default='classifiers/'): path to classifier directory
         verbose (bool, default=False): Print status updates
+        skip_cv (bool, default=False): Skip hyperparam optimization
 
     Returns:
         DataFrame with columns SNID and PROB_KN
@@ -131,7 +135,7 @@ def classify_datasets(mode : str,
         
         # Load classifier corresponding to dataset
         classifier_name = get_classifier_filename(
-            mode, dataset_id, id_map_file, rfc_dir, verbose)
+            mode, dataset_id, id_map_file, rfc_dir, verbose, skip_cv)
             
         # Load classifier
         classifier_dict = load(classifier_name)
@@ -187,6 +191,9 @@ def parse_args() -> argparse.ArgumentParser:
     parser.add_argument('--verbose',
                         action='store_true',
                         help='Print status updates')
+    parser.add_argument('--skip_cv',
+                        action='store_true',
+                        help='Skip hyperparam optimization')
 
     return parser
 
@@ -249,7 +256,8 @@ def classify_main(args):
         load(args.datasets_file),
         args.id_map_file,
         args.rfc_dir,
-        args.verbose)
+        args.verbose,
+        args.skip_cv)
 
     # Save results
     results.to_csv(f"{args.results_dir}{args.results_outfile}", index=False)

@@ -55,6 +55,9 @@ def parse_args() -> argparse.ArgumentParser:
     parser.add_argument('--verbose',
                         action='store_true',
                         help='Print status updates')
+    parser.add_argument('--skip_cv',
+                        action='store_true',
+                        help='Skip hyperparam optimization')
 
     return parser
 
