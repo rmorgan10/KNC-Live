@@ -4,6 +4,21 @@ A live version of KN-Classify for DESI-DOT data.
 
 Written by Robert Morgan.
 
+## Citation
+
+```
+@software{robert_morgan_2021_4681075,
+  author       = {Robert Morgan},
+  title        = {KN-Classify},
+  month        = apr,
+  year         = 2021,
+  publisher    = {Zenodo},
+  version      = {0.0.1},
+  doi          = {10.5281/zenodo.4681075},
+  url          = {https://doi.org/10.5281/zenodo.4681075}
+}
+```
+
 ## Environment Setup
 
 Other environments with more recent versions of python and scikit-learn will probably work too, but they have not been tested.
