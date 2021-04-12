@@ -245,8 +245,6 @@ def check_args(parser : argparse.ArgumentParser) -> argparse.Namespace :
             os.mkdir(results_dir)
         except FileNotFoundError:
             raise ArgumentError(f"{args.results_dir} is not valid")
-    else:
-        args.results_dir = os.getcwd() + 'knc_results/'
 
     return args
 
