@@ -126,6 +126,17 @@ python run_knc.py --process --classify --verbose --lcs_file testing_data/2021032
 
 This command will find your `realtime`-style formatted lightcurves in `testing_data/20210324_2Dets.npy`, process it and save the featurized data in `testing_data/real_datasets.npy`, then classify the featurized data using the training data and classifiers in `classifiers`, and lastly store the final output in `knc_results/`. It will also print status updates as it chugs along.
 
+### Speed Considerations
+
+The processing part of KN-Classify scales linearly with the number of objects to process. 
+It will be sped up in future versions, but for now you can process the data once and then use the saved results every time you want to classify your data.
+
+The classification part of KN-Classify is quite fast, but will take a significant amount of time to train whenever a new type of dataset is detected.
+To speed up the training you have two options: `--skip_cv` and `--distribute`
+
+- passing `--skip_cv` to run_knc.py or classify.py will skip the hyperparameter optimization step of the training process and use a default classifier. You will likely still achieve an accuracy above 95%, but a fully optimized classifier will not be trained.
+- passing `--distribute` to run_knc.py or classify.py will utilize all available cores to fit classifiers. This setting is recommended if you are working locally. If you are working on a login node of a cluster, you may risk your job getting killed for using too many resources.
+
 ## API Documentation
 
 https://rmorgan10.github.io/KNC-Live/docs/
