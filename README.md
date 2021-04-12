@@ -6,6 +6,8 @@ Written by Robert Morgan.
 
 ## Citation
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4681075.svg)](https://doi.org/10.5281/zenodo.4681075)
+
 ```
 @software{robert_morgan_2021_4681075,
   author       = {Robert Morgan},
