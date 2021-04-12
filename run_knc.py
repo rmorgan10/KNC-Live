@@ -58,6 +58,9 @@ def parse_args() -> argparse.ArgumentParser:
     parser.add_argument('--skip_cv',
                         action='store_true',
                         help='Skip hyperparam optimization')
+    parser.add_argument('--distribute',
+                        action='store_true',
+                        help='Use multiprocessing')
 
     return parser
 

@@ -59,7 +59,8 @@ def get_classifier_filename(mode : str,
                             id_map_file : str = 'id_map.npy',
                             rfc_dir : str = 'classifiers/',
                             verbose : bool = False,
-                            skip_cv : bool = False) -> str:
+                            skip_cv : bool = False,
+                            distribute : bool = False) -> str:
     """
     Given a classifier ID, return the filepath to the classifier. Trains
     a new classifier if no classifiers match the ID.
@@ -71,6 +72,7 @@ def get_classifier_filename(mode : str,
         rfc_dir (str, default='classifiers/'): path to classifier directory
         verbose (bool, default=False): Print status updates
         skip_cv (bool, default=False): Skip hyperparam optimization
+        distribute (bool, default=False): Use multiprocessing
 
     Returns:
         filename of the classifier
@@ -88,7 +90,8 @@ def get_classifier_filename(mode : str,
         id_map = {dataset_id : key}
         if verbose:
             print("No classifier found, training new classifier")
-        train.train_new(mode, dataset_id, key, rfc_dir, verbose, skip_cv)
+        train.train_new(
+            mode, dataset_id, key, rfc_dir, verbose, skip_cv, distribute)
         
     except KeyError:
         if verbose:
@@ -109,7 +112,8 @@ def classify_datasets(mode : str,
                       id_map_file : str = 'id_map.npy',
                       rfc_dir : str = 'classifiers/',
                       verbose : bool = False,
-                      skip_cv : bool = False) -> pd.DataFrame :
+                      skip_cv : bool = False,
+                      distribute : bool = False) -> pd.DataFrame :
     """
     For each dataset, load the corresponding classifier and predict
 
@@ -120,6 +124,7 @@ def classify_datasets(mode : str,
         rfc_dir (str, default='classifiers/'): path to classifier directory
         verbose (bool, default=False): Print status updates
         skip_cv (bool, default=False): Skip hyperparam optimization
+        distribute (bool, default=False): Use multiprocessing
 
     Returns:
         DataFrame with columns SNID and PROB_KN
@@ -135,7 +140,8 @@ def classify_datasets(mode : str,
         
         # Load classifier corresponding to dataset
         classifier_name = get_classifier_filename(
-            mode, dataset_id, id_map_file, rfc_dir, verbose, skip_cv)
+            mode, dataset_id, id_map_file, rfc_dir, verbose, skip_cv,
+            distribute)
             
         # Load classifier
         classifier_dict = load(classifier_name)
@@ -194,6 +200,9 @@ def parse_args() -> argparse.ArgumentParser:
     parser.add_argument('--skip_cv',
                         action='store_true',
                         help='Skip hyperparam optimization')
+    parser.add_argument('--distribute',
+                        action='store_true',
+                        help='Use multiprocessing')
 
     return parser
 

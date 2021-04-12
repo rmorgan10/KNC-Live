@@ -127,7 +127,8 @@ class Classifier:
                  data : Data,
                  doit : bool = False,
                  verbose : bool = False,
-                 skip_cv : bool = False):
+                 skip_cv : bool = False,
+                 distribute : bool = False):
         """
         Instantiate a Classifier object. If doit, the best_estimator,
         feature dict, best_params, and feature_importances attirbutes are
@@ -138,6 +139,7 @@ class Classifier:
             doit (bool) : Train a classifier
             verbose (bool, default=False): Print status updates
             skip_cv (bool, default=False): Skip hyperparam optimization
+            distribute (bool, default=False): Use multiprocessing
         """
         self.data = data
         self.X = data.X
@@ -146,9 +148,11 @@ class Classifier:
         self.y_train = data.y_train
         self.X_test = data.X_test
         self.y_test = data.y_test
-        
+
+        self.n_jobs = -1 if distribute else None
         self.rfc = RandomForestClassifier(
-            n_estimators=100, max_depth=5, random_state=6, criterion='gini')
+            n_estimators=100, max_depth=5, random_state=6, criterion='gini',
+            n_jobs=self.n_jobs)
 
         # Run all steps to train, optimize, and validate classifier
         if doit:
@@ -183,7 +187,7 @@ class Classifier:
                       'class_weight': ['balanced_subsample',
                                        'balanced', {0: 1, 1: 1}, {0: 5, 1:5}]}
 
-        gs = GridSearchCV(self.rfc, param_grid, cv=5)
+        gs = GridSearchCV(self.rfc, param_grid, cv=5, n_jobs=self.n_jobs)
         gs.fit(self.data.X_train, self.data.y_train)
         self.rfc = gs.best_estimator_
         
@@ -332,7 +336,8 @@ def train_new(mode : str,
               key : str,
               rfc_dir : str = 'classifiers/',
               verbose : bool = False,
-              skip_cv : bool = False):
+              skip_cv : bool = False,
+              distribute : bool = False):
     """
     Train a new classifier and return its key.
 
@@ -343,6 +348,7 @@ def train_new(mode : str,
         rfc_dir (str, default='classifiers/'): path to classifier directory
         verbose (bool, default=False): Print status updates
         skip_cv (bool, default=False): Skip hyperparam optimization 
+        distribute (bool, default=False): Use multiprocessing
     """
     # Load training data
     df = pd.read_csv(f'{rfc_dir}training_data_{mode}.csv')
@@ -361,7 +367,8 @@ def train_new(mode : str,
     if verbose:
         print("Training classifier")
     classifier = Classifier(
-        data=training_data, doit=True, verbose=verbose, skip_cv=skip_cv)
+        data=training_data, doit=True, verbose=verbose, skip_cv=skip_cv,
+        distribute=distribute)
         
     # Save classifier
     save(f"{rfc_dir}knclassifier_{mode}_{key}.npy", classifier.to_dict())
