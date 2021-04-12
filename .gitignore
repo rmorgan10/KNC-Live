@@ -8,3 +8,7 @@ dist/
 *egg-info/
 testing_data/my_tests
 knc_results/my_results
+classifiers/knclassifier*
+classifiers/*id_map.npy
+classifiers/features*
+classifiers/training_data*
