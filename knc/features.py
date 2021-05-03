@@ -266,6 +266,8 @@ class FeatureExtractor():
                 lc['FLUXCALERR'].values[lc['FLT'].values == flt].astype(float))
         
     def snr_max(self, lc, flt1, flt2=None):
+        if not ('FLUXCAL' in lc.columns and 'FLUXCALERR' in lc.columns):
+            return 'N'
         flux, fluxerr = self.__get_flux_and_fluxerr(lc, flt1)
         if len(flux) == 0:
             return 'N'
@@ -273,6 +275,8 @@ class FeatureExtractor():
             return (flux / fluxerr).max()
 
     def snr_mean(self, lc, flt1, flt2=None):
+        if not ('FLUXCAL' in lc.columns and 'FLUXCALERR' in lc.columns):
+            return 'N'
         flux, fluxerr =	self.__get_flux_and_fluxerr(lc, flt1)
         if len(flux) ==	0:
             return 'N'
@@ -280,6 +284,8 @@ class FeatureExtractor():
             return (flux / fluxerr).mean()
         
     def snr_mjd_of_max(self, lc, flt1, flt2=None):
+        if not ('FLUXCAL' in lc.columns and 'FLUXCALERR' in lc.columns):
+            return 'N'
         flux, fluxerr = self.__get_flux_and_fluxerr(lc, flt1)
         if len(flux) == 0:
             return 'N'
